@@ -1,0 +1,88 @@
+{
+  "name": "jodit-ai-adapter",
+  "displayName": "Jodit AI Assistant Adapter Service",
+  "version": "0.1.0",
+  "description": "Universal AI adapter service for Jodit Editor AI Assistant Pro using Vercel AI SDK",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jodit/jodit-ai-adapter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jodit/jodit-ai-adapter/issues"
+  },
+  "homepage": "https://xdsoft.net/jodit/",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node dist/run.js",
+    "dev": "CONFIG_FILE=config.example.json nodemon",
+    "build": "npm run clean && tsup",
+    "clean": "rm -rf dist",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest --runInBand --detectOpenHandles",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/ && tsc --noEmit",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write ./src",
+    "docker:build": "docker build -t jodit-ai-adapter .",
+    "docker:run": "docker run --rm -p 8082:8082 jodit-ai-adapter",
+    "docs:serve": "cd docs && . .venv/bin/activate && mkdocs serve",
+    "docs:build": "cd docs && . .venv/bin/activate && mkdocs build"
+  },
+  "keywords": [
+    "jodit",
+    "ai",
+    "adapter",
+    "openai",
+    "deepseek",
+    "claude",
+    "vercel-ai-sdk"
+  ],
+  "author": "Chupurnov Valeriy <chupurnov@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@ai-sdk/openai": "^2.0.71",
+    "@hapi/boom": "^10.0.1",
+    "ai": "^4.1.15",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "express-async-handler": "^1.2.0",
+    "winston": "^3.18.3",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.37.0",
+    "@types/express": "^5.0.3",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.8.1",
+    "@types/supertest": "^6.0.3",
+    "@typescript-eslint/eslint-plugin": "^8.46.1",
+    "@typescript-eslint/parser": "^8.46.1",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.37.0",
+    "globals": "^16.4.0",
+    "jest": "^30.2.0",
+    "nock": "^14.0.0",
+    "nodemon": "^3.1.10",
+    "prettier": "^3.6.2",
+    "supertest": "^7.1.4",
+    "ts-jest": "^29.4.5",
+    "ts-node": "^10.9.2",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "sideEffects": false
+}

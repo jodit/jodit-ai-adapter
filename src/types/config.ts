@@ -1,0 +1,133 @@
+/**
+ * Configuration types for the adapter service
+ */
+
+/**
+ * Authentication callback
+ * Validates API key and referer, returns user identifier or throws error
+ */
+export type AuthCallback = (
+	apiKey: string,
+	referer: string | undefined,
+	request: unknown
+) => Promise<string | null> | string | null;
+
+/**
+ * Usage statistics from AI provider
+ */
+export interface UsageStats {
+	/** User/API key identifier */
+	userId: string;
+
+	/** API key used for the request */
+	apiKey: string;
+
+	/** Provider name (openai, deepseek, etc.) */
+	provider: string;
+
+	/** Model used */
+	model: string;
+
+	/** Conversation ID */
+	conversationId: string;
+
+	/** Response ID */
+	responseId: string;
+
+	/** Number of prompt tokens */
+	promptTokens?: number;
+
+	/** Number of completion tokens */
+	completionTokens?: number;
+
+	/** Total tokens used */
+	totalTokens?: number;
+
+	/** Request timestamp */
+	timestamp: number;
+
+	/** Request duration in milliseconds */
+	duration: number;
+
+	/** Additional metadata */
+	metadata?: Record<string, unknown>;
+}
+
+/**
+ * Usage tracking callback
+ * Called after each AI request with usage statistics
+ */
+export type UsageCallback = (
+	stats: UsageStats
+) => Promise<void> | void;
+
+/**
+ * Supported AI providers
+ */
+export type AIProvider = 'openai' | 'deepseek' | 'anthropic' | 'google';
+
+/**
+ * Provider-specific configuration
+ */
+export interface ProviderConfig {
+	/** Provider type */
+	type: AIProvider;
+
+	/** API key (can be overridden by user's key) */
+	apiKey?: string;
+
+	/** API endpoint override */
+	apiEndpoint?: string;
+
+	/** Default model */
+	defaultModel?: string;
+
+	/** Additional provider-specific options */
+	options?: Record<string, unknown>;
+}
+
+/**
+ * Application configuration
+ */
+export interface AppConfig {
+	/** Server port */
+	port: number;
+
+	/** Enable debug logging */
+	debug: boolean;
+
+	/** Request timeout in milliseconds */
+	requestTimeout: number;
+
+	/** Maximum retries for failed requests */
+	maxRetries: number;
+
+	/** CORS origin (can be array or string or regex) */
+	corsOrigin?: string | string[] | RegExp;
+
+	/** Authentication callback */
+	checkAuthentication?: AuthCallback;
+
+	/** Usage tracking callback */
+	onUsage?: UsageCallback;
+
+	/** Enabled providers configuration */
+	providers: Record<string, ProviderConfig>;
+
+	/** API key validation pattern */
+	apiKeyPattern?: RegExp;
+
+	/** Require referer header */
+	requireReferer: boolean;
+
+	/** Allowed referer patterns */
+	allowedReferers?: RegExp[];
+}
+
+/**
+ * Express app locals for storing config
+ */
+export interface AppLocals {
+	config: AppConfig;
+	checkAuthentication?: AuthCallback;
+}

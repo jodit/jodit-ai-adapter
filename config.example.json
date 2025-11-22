@@ -1,0 +1,14 @@
+{
+	"port": 8082,
+	"debug": true,
+	"requestTimeout": 120000,
+	"maxRetries": 3,
+	"corsOrigin": "*",
+	"requireReferer": false,
+	"providers": {
+		"openai": {
+			"type": "openai",
+			"defaultModel": "gpt-4o"
+		}
+	}
+}
