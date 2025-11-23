@@ -221,7 +221,7 @@ export function createApp(config: AppConfig): Express {
 			});
 
 			// Cleanup on app close
-			const cleanup = async () => {
+			const cleanup = async (): Promise<void> => {
 				await rateLimiter.close();
 			};
 			process.on('SIGINT', cleanup);

@@ -10,9 +10,9 @@ export default async function teardown(): Promise<void> {
 	if (container) {
 		try {
 			await container.stop();
-			console.log('Redis container stopped');
+			console.info('Redis container stopped');
 		} catch (error) {
-			console.warn('Error stopping Redis container:', error);
+			console.error('Error stopping Redis container:', error);
 		}
 	}
 }

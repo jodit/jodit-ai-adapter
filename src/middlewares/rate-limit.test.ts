@@ -1,16 +1,26 @@
-import express, { type Express, type Request, type Response, type NextFunction } from 'express';
+import express, {
+	type Express,
+	type Request,
+	type Response,
+	type NextFunction
+} from 'express';
 import request from 'supertest';
 import { jest } from '@jest/globals';
 import Boom from '@hapi/boom';
 import { MemoryRateLimiter } from '../rate-limiter/memory-rate-limiter';
 import { rateLimitMiddleware, createRateLimitMiddleware } from './rate-limit';
-import type { IRateLimiter } from '../rate-limiter';
+import type { IRateLimiter, RateLimitResult } from '../rate-limiter';
 import type { AuthenticatedRequest } from '../types';
 
 /**
  * Simple error handler for tests
  */
-function errorHandler(err: Error | Boom.Boom, req: Request, res: Response, next: NextFunction): void {
+function errorHandler(
+	err: Error | Boom.Boom,
+	req: Request,
+	res: Response,
+	_: NextFunction
+): void {
 	if (Boom.isBoom(err)) {
 		res.status(err.output.statusCode).json({
 			success: false,
@@ -34,22 +44,6 @@ function errorHandler(err: Error | Boom.Boom, req: Request, res: Response, next:
 describe('Rate Limit Middleware', () => {
 	let app: Express;
 	let rateLimiter: IRateLimiter;
-
-	/**
-	 * Create app with rate limiting and error handler
-	 */
-	function setupApp(): Express {
-		const testApp = express();
-		testApp.use(express.json());
-		return testApp;
-	}
-
-	/**
-	 * Add error handler to app
-	 */
-	function addErrorHandler(testApp: Express): void {
-		testApp.use(errorHandler);
-	}
 
 	afterEach(async () => {
 		if (rateLimiter) {
@@ -92,9 +86,7 @@ describe('Rate Limit Middleware', () => {
 			// 4th request should be blocked
 			const response = await request(app).get('/test');
 			expect(response.status).toBe(429);
-			expect(response.body.error.message).toContain(
-				'Too many requests'
-			);
+			expect(response.body.error.message).toContain('Too many requests');
 		});
 
 		it('should include rate limit headers', async () => {
@@ -141,9 +133,7 @@ describe('Rate Limit Middleware', () => {
 
 			// Make 3 requests with user1
 			for (let i = 0; i < 3; i++) {
-				await request(app)
-					.get('/test')
-					.set('x-user-id', 'user1');
+				await request(app).get('/test').set('x-user-id', 'user1');
 			}
 
 			// user1 should be blocked
@@ -225,9 +215,7 @@ describe('Rate Limit Middleware', () => {
 				rateLimitMiddleware({
 					rateLimiter,
 					skip: async (req) => {
-						await new Promise((resolve) =>
-							setTimeout(resolve, 10)
-						);
+						await new Promise((resolve) => setTimeout(resolve, 10));
 						return req.headers['x-skip'] === 'true';
 					}
 				})
@@ -272,7 +260,8 @@ describe('Rate Limit Middleware', () => {
 		});
 
 		it('should call onLimitReached callback', async () => {
-			const onLimitReached = jest.fn();
+			const onLimitReached =
+				jest.fn<(req: Request, key: string) => void | Promise<void>>();
 
 			app.use(
 				rateLimitMiddleware({
@@ -301,11 +290,11 @@ describe('Rate Limit Middleware', () => {
 			// Create a failing rate limiter
 			const failingLimiter: IRateLimiter = {
 				consume: jest
-					.fn()
+					.fn<(key: string) => Promise<RateLimitResult>>()
 					.mockRejectedValue(new Error('Redis down')),
-				reset: jest.fn(),
-				getState: jest.fn(),
-				close: jest.fn()
+				reset: jest.fn<(key: string) => Promise<void>>(),
+				getState: jest.fn<(key: string) => Promise<RateLimitResult>>(),
+				close: jest.fn<() => Promise<void>>()
 			};
 
 			app.use(rateLimitMiddleware({ rateLimiter: failingLimiter }));
@@ -447,12 +436,8 @@ describe('Rate Limit Middleware', () => {
 			app.use(errorHandler);
 
 			// IP1 makes 2 requests
-			await request(app)
-				.get('/test')
-				.set('x-forwarded-for', '1.1.1.1');
-			await request(app)
-				.get('/test')
-				.set('x-forwarded-for', '1.1.1.1');
+			await request(app).get('/test').set('x-forwarded-for', '1.1.1.1');
+			await request(app).get('/test').set('x-forwarded-for', '1.1.1.1');
 
 			// IP1 should be blocked
 			const response1 = await request(app)

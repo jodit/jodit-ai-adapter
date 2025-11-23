@@ -22,7 +22,7 @@ export class MemoryRateLimiter implements IRateLimiter {
 		skip?: RateLimiterConfig['skip'];
 	};
 	private storage: Map<string, RequestRecord>;
-	private cleanupInterval: NodeJS.Timeout;
+	private cleanupInterval: ReturnType<typeof setInterval>;
 
 	constructor(config: RateLimiterConfig) {
 		this.config = {

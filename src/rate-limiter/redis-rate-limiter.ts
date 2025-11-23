@@ -38,7 +38,7 @@ export class RedisRateLimiter implements IRateLimiter {
 			lazyConnect: false,
 			enableOfflineQueue: false,
 			maxRetriesPerRequest: 3,
-			retryStrategy: (times) => {
+			retryStrategy: (times): number => {
 				const delay = Math.min(times * 50, 2000);
 				logger.warn('Redis connection retry', {
 					attempt: times,
