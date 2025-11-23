@@ -1,0 +1,630 @@
+openapi: 3.0.0
+info:
+  version: 0.1.10
+  title: jodit-ai-adapter
+  description: Universal AI adapter service for Jodit Editor AI Assistant Pro
+    using Vercel AI SDK
+  contact:
+    name: Chupurnov Valeriy <chupurnov@gmail.com>
+    url: https://xdsoft.net/jodit/
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:8082/
+    description: Local development server
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: API key in Authorization header as Bearer token
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: API key in x-api-key header
+    ApiKeyQuery:
+      type: apiKey
+      in: query
+      name: apikey
+      description: API key in query parameter
+  schemas:
+    ProviderInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Provider name
+          example: openai
+        type:
+          type: string
+          description: Provider type
+          example: openai
+        defaultModel:
+          type: string
+          description: Default model for this provider
+          example: gpt-4o
+        configured:
+          type: boolean
+          description: Whether provider is configured with API key
+          example: true
+      required:
+        - name
+        - type
+        - configured
+    ProvidersResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum:
+            - true
+          description: Success flag
+          example: true
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProviderInfo"
+          description: List of configured providers
+        supported:
+          type: array
+          items:
+            type: string
+          description: List of all supported provider types
+          example:
+            - openai
+            - anthropic
+            - google
+      required:
+        - success
+        - providers
+        - supported
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum:
+            - false
+          description: Success flag
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: number
+              description: Error code
+              example: 400
+            message:
+              type: string
+              description: Error message
+              example: Invalid request body
+            details:
+              nullable: true
+              description: Error details
+          required:
+            - code
+            - message
+          description: Error details
+      required:
+        - success
+        - error
+    GeneratedImage:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          description: URL of the generated image (if responseFormat is url)
+          example: https://example.com/generated-image.png
+        b64_json:
+          type: string
+          description: Base64-encoded image data (if responseFormat is b64_json)
+        revisedPrompt:
+          type: string
+          description: Revised prompt that was actually used by the model
+          example: A white siamese cat with striking blue eyes...
+    ImageGenerationResponse:
+      type: object
+      properties:
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeneratedImage"
+          description: Array of generated images
+        created:
+          type: number
+          description: Unix timestamp when images were created
+          example: 1700000000
+        metadata:
+          type: object
+          properties:
+            model:
+              type: string
+              description: Model used for generation
+              example: dall-e-3
+            prompt:
+              type: string
+              description: Original prompt used
+              example: A white siamese cat
+          additionalProperties:
+            nullable: true
+          description: Provider-specific metadata
+      required:
+        - images
+        - created
+    ImageGenerationSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum:
+            - true
+          description: Success flag
+          example: true
+        result:
+          $ref: "#/components/schemas/ImageGenerationResponse"
+      required:
+        - success
+        - result
+    ImageGenerationRequest:
+      type: object
+      properties:
+        prompt:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          description: Text prompt describing the image to generate
+          example: A white siamese cat with blue eyes sitting on a red cushion
+        model:
+          type: string
+          description: Model to use for image generation (e.g., dall-e-2, dall-e-3)
+          example: dall-e-3
+        n:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: "Number of images to generate (1-10, default: 1)"
+          example: 1
+        size:
+          type: string
+          enum:
+            - 256x256
+            - 512x512
+            - 1024x1024
+            - 1792x1024
+            - 1024x1792
+          description: Size of the generated image
+          example: 1024x1024
+        quality:
+          type: string
+          enum:
+            - standard
+            - hd
+          description: Quality of the generated image (DALL-E 3 only)
+          example: standard
+        style:
+          type: string
+          enum:
+            - vivid
+            - natural
+          description: Style of the generated image (DALL-E 3 only)
+          example: vivid
+        responseFormat:
+          type: string
+          enum:
+            - url
+            - b64_json
+          description: Format of the response (URL or base64-encoded JSON)
+          example: url
+        user:
+          type: string
+          description: User identifier for tracking purposes
+          example: user-123
+      required:
+        - prompt
+    ImageGenerationAPIRequest:
+      type: object
+      properties:
+        provider:
+          type: string
+          minLength: 1
+          description: Image generation provider name
+          example: openai
+        request:
+          $ref: "#/components/schemas/ImageGenerationRequest"
+      required:
+        - provider
+        - request
+    AIResponse:
+      type: object
+      properties:
+        responseId:
+          type: string
+          description: Response ID
+          example: resp-123
+        content:
+          type: string
+          description: Response content
+          example: Hello! How can I help you today?
+        finished:
+          type: boolean
+          description: Whether response is complete
+          example: true
+        toolCalls:
+          type: array
+          items:
+            nullable: true
+          description: Tool calls made by AI
+        metadata:
+          type: object
+          additionalProperties:
+            nullable: true
+          description: Response metadata
+          example:
+            usage:
+              total_tokens: 100
+      required:
+        - responseId
+        - content
+        - finished
+      description: AI response
+    AIRequestSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          enum:
+            - true
+          description: Success flag
+          example: true
+        result:
+          $ref: "#/components/schemas/AIResponse"
+      required:
+        - success
+        - result
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Message ID
+          example: msg-123
+        role:
+          type: string
+          enum:
+            - user
+            - assistant
+            - system
+            - tool
+          description: Message role
+          example: user
+        content:
+          type: string
+          description: Message content
+          example: Hello, how can I help you?
+        timestamp:
+          type: number
+          description: Message timestamp (Unix milliseconds)
+          example: 1700000000000
+        toolCalls:
+          type: array
+          items:
+            nullable: true
+          description: Tool calls made in this message
+        toolResults:
+          type: array
+          items:
+            nullable: true
+          description: Tool call results
+        artifacts:
+          type: array
+          items:
+            nullable: true
+          description: Message artifacts
+      required:
+        - id
+        - role
+        - content
+        - timestamp
+    ToolParameter:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Parameter name
+          example: query
+        type:
+          type: string
+          description: Parameter type (string, number, boolean, object, array)
+          example: string
+        description:
+          type: string
+          description: Parameter description
+          example: Search query string
+        required:
+          type: boolean
+          description: Whether the parameter is required
+          example: true
+        enum:
+          type: array
+          items:
+            type: string
+          description: Allowed values for enum types
+          example:
+            - option1
+            - option2
+        default:
+          nullable: true
+          description: Default value for the parameter
+      required:
+        - name
+        - type
+        - description
+        - required
+    ToolDefinition:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Tool/function name
+          example: search
+        description:
+          type: string
+          description: Tool/function description
+          example: Search for information
+        parameters:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolParameter"
+          description: Tool parameters
+      required:
+        - name
+        - description
+        - parameters
+    SelectionContext:
+      type: object
+      properties:
+        html:
+          type: string
+          description: Selected HTML content
+          example: <p>Selected text</p>
+        blockIndex:
+          type: number
+          description: Block index in editor
+          example: 0
+        rangeInfo:
+          type: object
+          properties:
+            startContainer:
+              type: string
+              description: Start container node path
+              example: /0/0
+            startOffset:
+              type: number
+              description: Start offset
+              example: 0
+            endContainer:
+              type: string
+              description: End container node path
+              example: /0/0
+            endOffset:
+              type: number
+              description: End offset
+              example: 10
+          required:
+            - startContainer
+            - startOffset
+            - endContainer
+            - endOffset
+          description: Selection range information
+      required:
+        - html
+    ConversationOptions:
+      type: object
+      properties:
+        model:
+          type: string
+          description: AI model to use
+          example: gpt-4o
+        temperature:
+          type: number
+          description: Temperature parameter (0-2)
+          example: 0.7
+      description: Conversation options
+    AIRequestContext:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum:
+            - full
+            - incremental
+          description: Request mode - full or incremental
+          example: full
+        conversationId:
+          type: string
+          description: Conversation ID
+          example: conv-123
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+          description: Conversation messages
+        parentMessageId:
+          type: string
+          description: Parent message ID for threading
+          example: msg-parent-123
+        tools:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolDefinition"
+          description: Available tools for function calling
+        selectionContexts:
+          type: array
+          items:
+            $ref: "#/components/schemas/SelectionContext"
+          description: Selected content from editor
+        conversationOptions:
+          $ref: "#/components/schemas/ConversationOptions"
+        instructions:
+          type: string
+          description: System instructions for AI
+          example: You are a helpful assistant.
+        metadata:
+          type: object
+          additionalProperties:
+            nullable: true
+          description: Additional metadata
+          example:
+            stream: true
+      required:
+        - mode
+        - conversationId
+        - tools
+      description: Request context
+    AIRequest:
+      type: object
+      properties:
+        provider:
+          type: string
+          minLength: 1
+          description: AI provider name
+          example: openai
+        context:
+          $ref: "#/components/schemas/AIRequestContext"
+      required:
+        - provider
+        - context
+  parameters: {}
+paths:
+  /ai/providers:
+    get:
+      operationId: getProviders
+      summary: Get available AI providers
+      description: Returns list of configured AI providers and all supported provider types
+      tags:
+        - AI
+      responses:
+        "200":
+          description: List of providers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvidersResponse"
+        "401":
+          description: Unauthorized - invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - referer not allowed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /image/generate:
+    post:
+      operationId: imageGenerate
+      summary: Generate images from text prompt
+      description: Generates images from a text description using AI image generation
+        models like DALL-E. Supports various sizes, qualities, and styles.
+      tags:
+        - Image Generation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageGenerationAPIRequest"
+      responses:
+        "200":
+          description: Successful image generation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageGenerationSuccessResponse"
+        "400":
+          description: Bad request - invalid request body or unsupported provider
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized - invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - referer not allowed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "408":
+          description: Request timeout - image generation was cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /ai/request:
+    post:
+      operationId: aiRequest
+      summary: Process AI request
+      description: Processes an AI request through the configured provider. Supports
+        both streaming and non-streaming responses.
+      tags:
+        - AI
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AIRequest"
+      responses:
+        "200":
+          description: Successful AI response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AIRequestSuccessResponse"
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-sent events stream with AI responses
+        "400":
+          description: Bad request - invalid request body or unsupported provider
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized - invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden - referer not allowed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
