@@ -48,9 +48,14 @@ jobs:
       - name: Verify build artifacts
         run: |
           test -f dist/index.js
-          test -f dist/index.cjs
+          test -f dist/index.mjs
           test -f dist/index.d.ts
+          test -f dist/index.d.mts
           test -f dist/run.js
+          test -f dist/run.mjs
+          test -f dist/run.d.ts
+          test -f dist/run.d.mts
+
 
   docker:
     runs-on: ubuntu-latest
