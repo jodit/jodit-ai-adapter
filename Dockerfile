@@ -26,7 +26,7 @@ WORKDIR /usr/src/app
 COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY ./package.json /usr/src/app/
-COPY ./.env /usr/src/app/
+RUN ./.env.production /usr/src/app/.env
 COPY ./config.example.json /usr/src/app/config.json
 
 # Set environment variable to read config from file
