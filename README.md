@@ -16,9 +16,11 @@ This service provides a secure, server-side proxy for AI providers (OpenAI, Deep
 - 🌐 **Multi-Provider Support** - OpenAI, DeepSeek, Anthropic, Google (extensible)
 - 📡 **Streaming Support** - Real-time streaming responses using Server-Sent Events (SSE)
 - 🛠️ **Tool Calling** - Full support for function/tool calling
+- 🚦 **Rate Limiting** - Configurable rate limiting with in-memory or Redis backend
+- 🔄 **Distributed Support** - Redis-based rate limiting for multi-instance deployments
 - 🚀 **Production Ready** - Docker support, TypeScript, comprehensive error handling
 - 📊 **Logging** - Winston-based logging with different levels
-- 🧪 **Testing** - Jest with nock for API mocking
+- 🧪 **Testing** - Jest with comprehensive test coverage
 
 ## Architecture
 
@@ -101,7 +103,15 @@ npm start
 | `LOG_LEVEL` | Logging level | `debug` (dev), `info` (prod) |
 | `CORS_ORIGIN` | CORS allowed origins | `*` |
 | `OPENAI_API_KEY` | OpenAI API key | - |
-| `OPENAI_DEFAULT_MODEL` | Default OpenAI model | `gpt-4o` |
+| `OPENAI_DEFAULT_MODEL` | Default OpenAI model | `gpt-5.1` |
+| `HTTP_PROXY` | HTTP/SOCKS5 proxy URL | - |
+| `RATE_LIMIT_ENABLED` | Enable rate limiting | `false` |
+| `RATE_LIMIT_TYPE` | Rate limiter type (`memory` or `redis`) | `memory` |
+| `RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `100` |
+| `RATE_LIMIT_WINDOW_MS` | Time window in ms | `60000` |
+| `REDIS_URL` | Redis connection URL | - |
+| `REDIS_PASSWORD` | Redis password | - |
+| `REDIS_DB` | Redis database number | `0` |
 | `CONFIG_FILE` | Path to JSON config file | - |
 
 ### Configuration File
@@ -289,6 +299,141 @@ interface UsageStats {
   duration: number;            // Request duration (ms)
   metadata?: Record<string, unknown>; // Additional data
 }
+```
+
+## Rate Limiting
+
+The service includes built-in rate limiting to prevent abuse and manage resource usage. Rate limiting can be configured to use either in-memory storage (for single-instance deployments) or Redis (for distributed/multi-instance deployments).
+
+### Configuration
+
+#### In-Memory Rate Limiting (Single Instance)
+
+```env
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_TYPE=memory
+RATE_LIMIT_MAX_REQUESTS=100
+RATE_LIMIT_WINDOW_MS=60000
+```
+
+This configuration allows 100 requests per minute per user/IP address.
+
+#### Redis Rate Limiting (Distributed)
+
+For production deployments with multiple instances, use Redis:
+
+```env
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_TYPE=redis
+RATE_LIMIT_MAX_REQUESTS=100
+RATE_LIMIT_WINDOW_MS=60000
+REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=your-password
+REDIS_DB=0
+```
+
+#### Using Docker Compose with Redis
+
+For development, use the provided Docker Compose configuration:
+
+```bash
+# Start Redis only
+docker-compose -f docker-compose.dev.yml up -d
+
+# Start Redis with monitoring UI
+docker-compose -f docker-compose.dev.yml up -d
+# Access Redis Commander at http://localhost:8081
+```
+
+Then configure your app to use Redis:
+
+```env
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_TYPE=redis
+REDIS_URL=redis://localhost:6379
+```
+
+### Programmatic Configuration
+
+```typescript
+import { start } from 'jodit-ai-adapter';
+
+await start({
+  port: 8082,
+  rateLimit: {
+    enabled: true,
+    type: 'redis',
+    maxRequests: 100,
+    windowMs: 60000, // 1 minute
+    redisUrl: 'redis://localhost:6379',
+    keyPrefix: 'rl:'
+  },
+  providers: {
+    openai: {
+      type: 'openai',
+      apiKey: process.env.OPENAI_API_KEY
+    }
+  }
+});
+```
+
+### Rate Limit Headers
+
+When rate limiting is enabled, the following headers are included in responses:
+
+- `X-RateLimit-Limit`: Maximum requests allowed in the window
+- `X-RateLimit-Remaining`: Remaining requests in current window
+- `X-RateLimit-Reset`: ISO 8601 timestamp when the rate limit resets
+- `Retry-After`: Seconds to wait before retrying (only when limit exceeded)
+
+### Rate Limit Response
+
+When rate limit is exceeded, the service returns a `429 Too Many Requests` error:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": 429,
+    "message": "Too many requests, please try again later",
+    "details": {
+      "limit": 100,
+      "current": 101,
+      "resetTime": 45000
+    }
+  }
+}
+```
+
+### Key Extraction
+
+By default, rate limiting uses:
+1. **User ID** (if authenticated via `checkAuthentication` callback)
+2. **IP Address** (fallback if no user ID)
+
+This means authenticated users are tracked by their user ID, while anonymous requests are tracked by IP address.
+
+### Custom Rate Limiting
+
+You can implement custom rate limiting logic:
+
+```typescript
+import { start, MemoryRateLimiter } from 'jodit-ai-adapter';
+
+// Create custom rate limiter with skip function
+const rateLimiter = new MemoryRateLimiter({
+  maxRequests: 100,
+  windowMs: 60000,
+  skip: (key) => {
+    // Skip rate limiting for admin users
+    return key.startsWith('user:admin-');
+  }
+});
+
+await start({
+  port: 8082,
+  // ... other config
+});
 ```
 
 ## Client Integration (Jodit)

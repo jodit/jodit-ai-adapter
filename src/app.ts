@@ -16,6 +16,8 @@ import type {
 } from './types';
 import { corsMiddleware } from './middlewares/cors';
 import { authMiddleware } from './middlewares/auth';
+import { createRateLimitMiddleware } from './middlewares/rate-limit';
+import { RateLimiterFactory } from './rate-limiter';
 import { AdapterFactory } from './adapters/adapter-factory';
 import { logger } from './helpers/logger';
 import { z } from 'zod';
@@ -192,6 +194,45 @@ export function createApp(config: AppConfig): Express {
 
 	// Apply authentication middleware to all routes except health check
 	app.use(authMiddleware(config));
+
+	// Rate limiting middleware (after auth, so we can use userId)
+	if (config.rateLimit?.enabled) {
+		try {
+			const rateLimiter = RateLimiterFactory.create(
+				config.rateLimit.type,
+				{
+					maxRequests: config.rateLimit.maxRequests,
+					windowMs: config.rateLimit.windowMs,
+					keyPrefix: config.rateLimit.keyPrefix,
+					redisUrl: config.rateLimit.redisUrl,
+					redisOptions: {
+						password: config.rateLimit.redisPassword,
+						db: config.rateLimit.redisDb
+					}
+				}
+			);
+
+			app.use(createRateLimitMiddleware(rateLimiter));
+
+			logger.info('Rate limiting enabled', {
+				type: config.rateLimit.type,
+				maxRequests: config.rateLimit.maxRequests,
+				windowMs: config.rateLimit.windowMs
+			});
+
+			// Cleanup on app close
+			const cleanup = async () => {
+				await rateLimiter.close();
+			};
+			process.on('SIGINT', cleanup);
+			process.on('SIGTERM', cleanup);
+		} catch (error) {
+			logger.error('Failed to initialize rate limiter:', error);
+			logger.warn('Rate limiting is disabled due to initialization error');
+		}
+	} else {
+		logger.info('Rate limiting is disabled');
+	}
 
 	// Image generation routes
 	app.use('/image', imageGenerateRouter);

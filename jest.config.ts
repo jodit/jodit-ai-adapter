@@ -24,6 +24,9 @@ const moduleNameMapper = {
 };
 
 export default {
+  testEnvironment: 'node',
+  globalSetup: '<rootDir>/src/tests/global-setup.ts',
+  globalTeardown: '<rootDir>/src/tests/global-teardown.ts',
   projects: [
     {
       displayName: 'node',

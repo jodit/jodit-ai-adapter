@@ -90,6 +90,35 @@ export interface ProviderConfig {
 }
 
 /**
+ * Rate limiter configuration
+ */
+export interface RateLimiterConfig {
+	/** Enable rate limiting */
+	enabled: boolean;
+
+	/** Rate limiter type (memory or redis) */
+	type: 'memory' | 'redis';
+
+	/** Maximum number of requests per window */
+	maxRequests: number;
+
+	/** Time window in milliseconds */
+	windowMs: number;
+
+	/** Redis URL (required if type is 'redis') */
+	redisUrl?: string;
+
+	/** Redis password */
+	redisPassword?: string;
+
+	/** Redis database number */
+	redisDb?: number;
+
+	/** Key prefix for rate limiter */
+	keyPrefix?: string;
+}
+
+/**
  * Application configuration
  */
 export interface AppConfig {
@@ -125,6 +154,9 @@ export interface AppConfig {
 
 	/** Allowed referer patterns */
 	allowedReferers?: RegExp[];
+
+	/** Rate limiter configuration */
+	rateLimit?: RateLimiterConfig;
 }
 
 /**

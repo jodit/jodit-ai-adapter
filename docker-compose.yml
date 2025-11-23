@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # Redis for rate limiting (dev only)
+  redis:
+    image: redis:7-alpine
+    container_name: jodit-ai-adapter-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - jodit-network
+
+  # Jodit AI Adapter Service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jodit-ai-adapter
+    ports:
+      - "${PORT:-8082}:${PORT:-8082}"
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=${PORT:-8082}
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
+
+      # OpenAI Configuration
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_DEFAULT_MODEL=${OPENAI_DEFAULT_MODEL:-gpt-4o}
+      - OPENAI_API_ENDPOINT=${OPENAI_API_ENDPOINT}
+      - HTTP_PROXY=${HTTP_PROXY}
+
+      # CORS
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+
+      # Rate Limiting
+      - RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED:-true}
+      - RATE_LIMIT_TYPE=${RATE_LIMIT_TYPE:-redis}
+      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-100}
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-60000}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=${REDIS_DB:-0}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - jodit-network
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+    driver: local
+
+networks:
+  jodit-network:
+    driver: bridge
