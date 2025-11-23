@@ -7,6 +7,7 @@ const isDevelopment = process.env.NODE_ENV === 'development';
  */
 export const logger = winston.createLogger({
 	level: process.env.LOG_LEVEL || (isDevelopment ? 'debug' : 'info'),
+	silent: !process.env.LOGGER && process.env.NODE_ENV === 'test',
 	format: isDevelopment
 		? winston.format.combine(
 				winston.format.colorize(),
