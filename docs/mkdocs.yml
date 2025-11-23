@@ -8,7 +8,7 @@ repo_url: https://github.com/jodit/jodit-ai-adapter
 edit_uri: edit/main/docs/content/
 
 docs_dir: content
-site_dir: dist/site
+site_dir: ../dist/site
 
 theme:
   name: material
