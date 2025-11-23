@@ -3,6 +3,7 @@ name: Generate and Deploy Documentation
 on:
   workflow_dispatch:
   push:
+    tags: ['*']
     branches:
       - main
     paths:
