@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jodit Editor Demo with File Connector</title>
+
+    <!-- Jodit CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/jodit-pro@4/es2021/jodit.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/jodit-pro@4/es2021/plugins/finder/finder.min.css"
+    />
+
+    <!-- Jodit JS -->
+    <script src="https://unpkg.com/jodit-pro@4/es2021/jodit.min.js"></script>
+    <script src="https://unpkg.com/jodit-pro@4/es2021/plugins/finder/finder.min.js"></script>
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f5f5f5;
+
+        box-sizing: border-box;
+        * {
+          box-sizing: border-box;
+        }
+      }
+
+      .container {
+        max-width: 1200px;
+        height: calc(100% - 40px);
+        margin: 20px auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+      }
+
+      h1 {
+        color: #333;
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .browser {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        overflow: auto;
+        border: 1px solid #f6f6f6;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Jodit PRO Editor Demo with File Connector</h1>
+
+      <div class="browser" id="browser"></div>
+    </div>
+
+    <script>
+      let filebrowser = null;
+      const host = window.location.hostname.match(/localhost|127\.0\.0\.1/)
+        ? 'http://localhost:8081'
+        : 'https://xdsoft.net/jodit/finder2/';
+        
+      const serverUrl = host;
+
+      function initialize() {
+        const config = {
+          ajax: {
+            url: serverUrl
+          },
+          uploader: {
+            url: `${serverUrl}/?action=fileUpload`
+          }
+        };
+
+        // Initialize Jodit editor
+        filebrowser = new Jodit.modules.FileBrowserPro(config);
+        filebrowser.open();
+
+        Object.assign(filebrowser.dialog.style, {
+          position: 'static',
+          width: '100%',
+          height: '100%',
+          padding: 0
+        });
+
+        document.getElementById('browser').appendChild(filebrowser.dialog);
+      }
+      initialize();
+    </script>
+  </body>
+</html>
