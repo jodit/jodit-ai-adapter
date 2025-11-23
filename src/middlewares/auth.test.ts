@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
+import { jest } from '@jest/globals';
 import { authMiddleware } from './auth';
-import type { AppConfig, AuthenticatedRequest } from '../types';
+import type { AppConfig, AuthenticatedRequest, AuthCallback } from '../types';
 
 describe('authMiddleware', () => {
 	const mockConfig: AppConfig = {
@@ -19,22 +20,24 @@ describe('authMiddleware', () => {
 	beforeEach(() => {
 		mockReq = {
 			headers: {},
+			query: {},
 			ip: '127.0.0.1'
 		};
 
 		const jsonMock = jest.fn();
+		const statusMock = jest.fn().mockReturnThis();
 		mockRes = {
-			status: jest.fn().mockReturnThis(),
-			json: jsonMock
+			status: statusMock as unknown as Response['status'],
+			json: jsonMock as unknown as Response['json']
 		};
 
-		mockNext = jest.fn();
+		mockNext = jest.fn() as unknown as NextFunction;
 	});
 
 	describe('API key validation', () => {
 		it('should accept valid API key in Authorization header', async () => {
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789-ABCDEF012345'
+				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789'
 			};
 
 			const middleware = authMiddleware(mockConfig);
@@ -46,13 +49,13 @@ describe('authMiddleware', () => {
 
 			expect(mockNext).toHaveBeenCalled();
 			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
-				'ABCDEF0123456789-ABCDEF012345'
+				'ABCDEF0123456789ABCDEF0123456789'
 			);
 		});
 
 		it('should accept valid API key in x-api-key header', async () => {
 			mockReq.headers = {
-				'x-api-key': 'ABCDEF0123456789-ABCDEF012345'
+				'x-api-key': 'ABCDEF0123456789ABCDEF0123456789'
 			};
 
 			const middleware = authMiddleware(mockConfig);
@@ -64,7 +67,67 @@ describe('authMiddleware', () => {
 
 			expect(mockNext).toHaveBeenCalled();
 			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
-				'ABCDEF0123456789-ABCDEF012345'
+				'ABCDEF0123456789ABCDEF0123456789'
+			);
+		});
+
+		it('should accept valid API key in query parameter', async () => {
+			mockReq.query = {
+				apikey: 'ABCDEF0123456789ABCDEF0123456789'
+			};
+
+			const middleware = authMiddleware(mockConfig);
+			await middleware(
+				mockReq as Request,
+				mockRes as Response,
+				mockNext
+			);
+
+			expect(mockNext).toHaveBeenCalled();
+			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
+				'ABCDEF0123456789ABCDEF0123456789'
+			);
+		});
+
+		it('should prioritize Authorization header over query parameter', async () => {
+			mockReq.headers = {
+				authorization: 'Bearer AAAABBBBCCCCDDDDEEEEFFFF00001111'
+			};
+			mockReq.query = {
+				apikey: 'AAAABBBBCCCCDDDDEEEEFFFF00002222'
+			};
+
+			const middleware = authMiddleware(mockConfig);
+			await middleware(
+				mockReq as Request,
+				mockRes as Response,
+				mockNext
+			);
+
+			expect(mockNext).toHaveBeenCalled();
+			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
+				'AAAABBBBCCCCDDDDEEEEFFFF00001111'
+			);
+		});
+
+		it('should prioritize x-api-key header over query parameter', async () => {
+			mockReq.headers = {
+				'x-api-key': 'AAAABBBBCCCCDDDDEEEEFFFF00001111'
+			};
+			mockReq.query = {
+				apikey: 'AAAABBBBCCCCDDDDEEEEFFFF00002222'
+			};
+
+			const middleware = authMiddleware(mockConfig);
+			await middleware(
+				mockReq as Request,
+				mockRes as Response,
+				mockNext
+			);
+
+			expect(mockNext).toHaveBeenCalled();
+			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
+				'AAAABBBBCCCCDDDDEEEEFFFF00001111'
 			);
 		});
 
@@ -132,7 +195,7 @@ describe('authMiddleware', () => {
 			};
 
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789-ABCDEF012345'
+				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789'
 			};
 
 			const middleware = authMiddleware(configWithReferer);
@@ -157,7 +220,7 @@ describe('authMiddleware', () => {
 			};
 
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789-ABCDEF012345',
+				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789',
 				referer: 'https://example.com/page'
 			};
 
@@ -179,7 +242,7 @@ describe('authMiddleware', () => {
 			};
 
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789-ABCDEF012345',
+				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789',
 				referer: 'https://evil.com/page'
 			};
 
@@ -205,7 +268,7 @@ describe('authMiddleware', () => {
 			};
 
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789-ABCDEF012345',
+				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789',
 				origin: 'https://example.com'
 			};
 
@@ -222,17 +285,15 @@ describe('authMiddleware', () => {
 
 	describe('Custom authentication callback', () => {
 		it('should call custom auth callback and accept valid user', async () => {
-			const mockAuthCallback = jest
-				.fn()
-				.mockResolvedValue('user-123');
+			const mockAuthCallback = jest.fn().mockResolvedValue('user-123' as never);
 
-			const configWithAuth = {
+			const configWithAuth: AppConfig = {
 				...mockConfig,
-				checkAuthentication: mockAuthCallback
+				checkAuthentication: mockAuthCallback as never
 			};
 
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789-ABCDEF012345'
+				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789'
 			};
 
 			const middleware = authMiddleware(configWithAuth);
@@ -243,7 +304,7 @@ describe('authMiddleware', () => {
 			);
 
 			expect(mockAuthCallback).toHaveBeenCalledWith(
-				'ABCDEF0123456789-ABCDEF012345',
+				'ABCDEF0123456789ABCDEF0123456789',
 				undefined,
 				mockReq
 			);
@@ -252,15 +313,19 @@ describe('authMiddleware', () => {
 		});
 
 		it('should reject when custom auth callback returns null', async () => {
-			const mockAuthCallback = jest.fn().mockResolvedValue(null);
+			const mockAuthCallback = jest
+				.fn<
+					() => Promise<string | null>
+				>()
+				.mockResolvedValue(null);
 
-			const configWithAuth = {
+			const configWithAuth: AppConfig = {
 				...mockConfig,
-				checkAuthentication: mockAuthCallback
+				checkAuthentication: mockAuthCallback as unknown as AuthCallback
 			};
 
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789-ABCDEF012345'
+				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789'
 			};
 
 			const middleware = authMiddleware(configWithAuth);
@@ -278,17 +343,15 @@ describe('authMiddleware', () => {
 		});
 
 		it('should handle errors from custom auth callback', async () => {
-			const mockAuthCallback = jest
-				.fn()
-				.mockRejectedValue(new Error('Database error'));
+			const mockAuthCallback = jest.fn().mockRejectedValue(new Error('Database error') as never);
 
-			const configWithAuth = {
+			const configWithAuth: AppConfig = {
 				...mockConfig,
-				checkAuthentication: mockAuthCallback
+				checkAuthentication: mockAuthCallback as never
 			};
 
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789-ABCDEF012345'
+				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789'
 			};
 
 			const middleware = authMiddleware(configWithAuth);

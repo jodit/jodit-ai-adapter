@@ -8,7 +8,14 @@
 	"providers": {
 		"openai": {
 			"type": "openai",
-			"defaultModel": "gpt-4o"
+			"defaultModel": "gpt-4o",
+			"httpProxy": "http://proxy.example.com:8080"
+		},
+		"deepseek": {
+			"type": "deepseek",
+			"apiEndpoint": "https://api.deepseek.com",
+			"defaultModel": "deepseek-chat",
+			"httpProxy": "socks5://proxy.example.com:1080"
 		}
 	}
 }

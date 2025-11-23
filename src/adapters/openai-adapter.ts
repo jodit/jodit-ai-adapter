@@ -15,20 +15,31 @@ import type {
 } from '../types';
 import { BaseAdapter, type BaseAdapterConfig } from './base-adapter';
 import { logger } from '../helpers/logger';
+import { createFetch } from '../helpers/proxy';
 
 /**
  * OpenAI adapter using Vercel AI SDK
  */
 export class OpenAIAdapter extends BaseAdapter {
 	private provider: ReturnType<typeof createOpenAI>;
+	private customFetch?: typeof fetch;
 
 	constructor(config: BaseAdapterConfig) {
 		super(config);
 
+		// Create fetch with proxy support if configured
+		if (config.httpProxy) {
+			this.customFetch = createFetch(config.httpProxy);
+			logger.info('OpenAI adapter initialized with proxy', {
+				proxy: config.httpProxy
+			});
+		}
+
 		// Initialize OpenAI provider with Vercel AI SDK
 		this.provider = createOpenAI({
 			apiKey: config.apiKey,
-			baseURL: config.apiEndpoint || 'https://api.openai.com/v1'
+			baseURL: config.apiEndpoint || 'https://api.openai.com/v1',
+			fetch: this.customFetch
 		});
 	}
 

@@ -19,6 +19,7 @@ import { authMiddleware } from './middlewares/auth';
 import { AdapterFactory } from './adapters/adapter-factory';
 import { logger } from './helpers/logger';
 import { z } from 'zod';
+import imageGenerateRouter from './routes/image-generate';
 
 /**
  * Adapt validated context to IAIRequestContext
@@ -191,6 +192,9 @@ export function createApp(config: AppConfig): Express {
 
 	// Apply authentication middleware to all routes except health check
 	app.use(authMiddleware(config));
+
+	// Image generation routes
+	app.use('/image', imageGenerateRouter);
 
 	// Main AI request endpoint
 	app.post(

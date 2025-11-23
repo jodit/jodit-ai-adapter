@@ -10,7 +10,10 @@ const DEFAULT_API_KEY_PATTERN = /^[A-F0-9-]{32}$/i;
 
 /**
  * Extract API key from request
- * Supports Authorization header (Bearer token) and x-api-key header
+ * Supports:
+ * - Authorization header (Bearer token)
+ * - x-api-key header
+ * - apikey query parameter
  */
 function extractApiKey(req: Request): string | undefined {
 	// Check Authorization header (Bearer token)
@@ -23,6 +26,12 @@ function extractApiKey(req: Request): string | undefined {
 	const apiKeyHeader = req.headers['x-api-key'];
 	if (typeof apiKeyHeader === 'string') {
 		return apiKeyHeader;
+	}
+
+	// Check apikey query parameter
+	const apiKeyQuery = req.query.apikey;
+	if (typeof apiKeyQuery === 'string') {
+		return apiKeyQuery;
 	}
 
 	return undefined;

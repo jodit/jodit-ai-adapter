@@ -46,6 +46,7 @@ export class AdapterFactory {
 			apiKey,
 			apiEndpoint: config.apiEndpoint,
 			defaultModel: config.defaultModel,
+			httpProxy: config.httpProxy,
 			options: config.options
 		});
 	}

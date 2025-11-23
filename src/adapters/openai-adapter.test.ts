@@ -1,6 +1,47 @@
 import nock from 'nock';
-import { OpenAIAdapter } from './openai-adapter';
+import { jest } from '@jest/globals';
 import type { IAIRequestContext } from '../types';
+
+// Define mock return types based on the AI SDK
+type MockGenerateTextResult = {
+	text: string;
+	usage?: {
+		prompt_tokens?: number;
+		completion_tokens?: number;
+		total_tokens?: number;
+	};
+	toolCalls?: Array<{
+		toolCallId: string;
+		toolName: string;
+		args: Record<string, unknown>;
+	}>;
+};
+
+type MockStreamTextResult = {
+	textStream: AsyncGenerator<string>;
+	response: Promise<{
+		usage?: {
+			prompt_tokens?: number;
+			completion_tokens?: number;
+			total_tokens?: number;
+		};
+	}>;
+};
+
+// Create mock functions BEFORE mocking the module
+const mockStreamText = jest.fn<() => MockStreamTextResult>();
+const mockGenerateText = jest.fn<() => Promise<MockGenerateTextResult>>();
+const mockCreateOpenAI = jest.fn(() => jest.fn());
+
+// Mock the ai module with our mock functions
+jest.unstable_mockModule('ai', () => ({
+	streamText: mockStreamText,
+	generateText: mockGenerateText,
+	createOpenAI: mockCreateOpenAI
+}));
+
+// Now import after mocking
+const { OpenAIAdapter } = await import('./openai-adapter.js');
 
 describe('OpenAIAdapter', () => {
 	const mockApiKey = 'test-api-key-1234567890';
@@ -26,6 +67,8 @@ describe('OpenAIAdapter', () => {
 	beforeEach(() => {
 		// Clean up all nock interceptors before each test
 		nock.cleanAll();
+		// Reset mocks
+		jest.clearAllMocks();
 	});
 
 	afterAll(() => {
@@ -57,32 +100,15 @@ describe('OpenAIAdapter', () => {
 				apiKey: mockApiKey
 			});
 
-			// Mock OpenAI API response
-			const mockResponse = {
-				id: 'chatcmpl-123',
-				object: 'chat.completion',
-				created: 1677652288,
-				model: 'gpt-4o',
-				choices: [
-					{
-						index: 0,
-						message: {
-							role: 'assistant',
-							content: 'Hello! How can I help you today?'
-						},
-						finish_reason: 'stop'
-					}
-				],
+			// Mock generateText response
+			mockGenerateText.mockResolvedValue({
+				text: 'Hello! How can I help you today?',
 				usage: {
 					prompt_tokens: 10,
 					completion_tokens: 20,
 					total_tokens: 30
 				}
-			};
-
-			nock('https://api.openai.com')
-				.post('/v1/chat/completions')
-				.reply(200, mockResponse);
+			});
 
 			const contextWithNoStream = {
 				...mockContext,
@@ -110,15 +136,22 @@ describe('OpenAIAdapter', () => {
 				apiKey: mockApiKey
 			});
 
-			// Note: Testing streaming is complex with nock
-			// This is a simplified test - real implementation would mock SSE stream
-			const mockStreamResponse = `data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1677652288,"model":"gpt-4o","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}\n\ndata: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1677652288,"model":"gpt-4o","choices":[{"index":0,"delta":{"content":"!"},"finish_reason":null}]}\n\ndata: [DONE]\n\n`;
+			// Mock streamText response
+			async function* mockTextStream(): AsyncGenerator<string> {
+				yield 'Hello';
+				yield '!';
+			}
 
-			nock('https://api.openai.com')
-				.post('/v1/chat/completions')
-				.reply(200, mockStreamResponse, {
-					'Content-Type': 'text/event-stream'
-				});
+			mockStreamText.mockReturnValue({
+				textStream: mockTextStream(),
+				response: Promise.resolve({
+					usage: {
+						prompt_tokens: 10,
+						completion_tokens: 20,
+						total_tokens: 30
+					}
+				})
+			});
 
 			const abortController = new AbortController();
 			const result = await adapter.handleRequest(
@@ -144,29 +177,14 @@ describe('OpenAIAdapter', () => {
 				apiKey: mockApiKey
 			});
 
-			const mockResponseWithTools = {
-				id: 'chatcmpl-123',
-				object: 'chat.completion',
-				created: 1677652288,
-				model: 'gpt-4o',
-				choices: [
+			// Mock generateText with tool calls
+			mockGenerateText.mockResolvedValue({
+				text: '',
+				toolCalls: [
 					{
-						index: 0,
-						message: {
-							role: 'assistant',
-							content: '',
-							tool_calls: [
-								{
-									id: 'call_123',
-									type: 'function',
-									function: {
-										name: 'get_weather',
-										arguments: '{"location":"San Francisco"}'
-									}
-								}
-							]
-						},
-						finish_reason: 'tool_calls'
+						toolCallId: 'call_123',
+						toolName: 'get_weather',
+						args: { location: 'San Francisco' }
 					}
 				],
 				usage: {
@@ -174,11 +192,7 @@ describe('OpenAIAdapter', () => {
 					completion_tokens: 20,
 					total_tokens: 30
 				}
-			};
-
-			nock('https://api.openai.com')
-				.post('/v1/chat/completions')
-				.reply(200, mockResponseWithTools);
+			});
 
 			const contextWithTools = {
 				...mockContext,
@@ -220,14 +234,10 @@ describe('OpenAIAdapter', () => {
 				apiKey: mockApiKey
 			});
 
-			nock('https://api.openai.com')
-				.post('/v1/chat/completions')
-				.reply(401, {
-					error: {
-						message: 'Invalid API key',
-						type: 'invalid_request_error'
-					}
-				});
+			// Mock generateText to reject with error
+			mockGenerateText.mockRejectedValue(
+				new Error('Invalid API key')
+			);
 
 			const contextWithNoStream = {
 				...mockContext,
@@ -252,10 +262,16 @@ describe('OpenAIAdapter', () => {
 				apiKey: mockApiKey
 			});
 
-			nock('https://api.openai.com')
-				.post('/v1/chat/completions')
-				.delay(1000) // Delay to allow cancellation
-				.reply(200, {});
+			// Mock generateText to simulate abort
+			mockGenerateText.mockImplementation(() => {
+				return new Promise((_, reject) => {
+					setTimeout(() => {
+						const error = new Error('Aborted');
+						error.name = 'AbortError';
+						reject(error);
+					}, 200);
+				});
+			});
 
 			const contextWithNoStream = {
 				...mockContext,

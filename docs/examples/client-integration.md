@@ -117,12 +117,12 @@ const editor = Jodit.make('#editor', {
     panelWidth: 400,
 
     // Model settings
-    defaultModel: 'gpt-4o',
+    defaultModel: 'gpt-5.1',
     defaultTemperature: 0.7,
     allowEditDialogSettings: true,
 
     dialogSettings: {
-      models: ['gpt-4o', 'gpt-4o-mini'],
+      models: ['gpt-5.1', 'gpt-5.1-mini', 'gpt-5.1-nano'],
       temperature: {
         min: 0,
         max: 2,

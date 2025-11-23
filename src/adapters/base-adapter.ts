@@ -14,6 +14,7 @@ export interface BaseAdapterConfig {
 	apiKey: string;
 	apiEndpoint?: string;
 	defaultModel?: string;
+	httpProxy?: string;
 	options?: Record<string, unknown>;
 }
 

@@ -82,6 +82,9 @@ export interface ProviderConfig {
 	/** Default model */
 	defaultModel?: string;
 
+	/** HTTP/SOCKS5 proxy URL (e.g., http://proxy:8080 or socks5://proxy:1080) */
+	httpProxy?: string;
+
 	/** Additional provider-specific options */
 	options?: Record<string, unknown>;
 }
