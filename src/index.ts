@@ -1,4 +1,5 @@
 import type { Server } from 'http';
+import type { Application, Router } from 'express';
 import type {
 	AppConfig,
 	AuthCallback,
@@ -16,7 +17,7 @@ let server: Server | null = null;
 
 // Re-export for direct use
 export { createApp };
-export type { AppConfig, AuthCallback, UsageCallback, UsageStats };
+export type { AppConfig, AuthCallback, UsageCallback, UsageStats, Application, Router };
 export * from './types';
 
 /**
@@ -27,26 +28,33 @@ export interface StartOptions {
 	config?: Partial<AppConfig>;
 	checkAuthentication?: AuthCallback;
 	onUsage?: UsageCallback;
+	existingApp?: Application;
+	existingRouter?: Router;
 }
 
 /**
  * Start the adapter service
+ * Can work as standalone server OR integrate into existing Express app
  */
 export async function start(
 	options?: StartOptions | number,
 	customConfig?: Partial<AppConfig>
-): Promise<Server> {
+): Promise<Server | Application> {
 	// Support both old signature (port, config) and new (options object)
 	let PORT: number;
 	let config: Partial<AppConfig> | undefined;
 	let checkAuthentication: AuthCallback | undefined;
 	let onUsage: UsageCallback | undefined;
+	let existingApp: Application | undefined;
+	let existingRouter: Router | undefined;
 
 	if (typeof options === 'object') {
 		PORT = options.port ?? defaultConfig.port;
 		config = options.config;
 		checkAuthentication = options.checkAuthentication;
 		onUsage = options.onUsage;
+		existingApp = options.existingApp;
+		existingRouter = options.existingRouter;
 	} else {
 		PORT = options ?? defaultConfig.port;
 		config = customConfig;
@@ -78,6 +86,16 @@ export async function start(
 		finalConfig.onUsage = onUsage;
 	}
 
+	// Check if integrating into existing app
+	if (existingApp) {
+		// INTEGRATION MODE: Mount to existing app, don't start server
+		const app = createApp(finalConfig, existingApp, existingRouter);
+		logger.info('AI Adapter integrated as middleware at /ai/*');
+		logger.info(`Supported providers: ${Object.keys(finalConfig.providers).join(', ')}`);
+		return app;
+	}
+
+	// STANDALONE MODE: Create new server
 	const app = createApp(finalConfig);
 
 	return new Promise((resolve, reject) => {
@@ -88,7 +106,7 @@ export async function start(
 
 			if (process.env.NODE_ENV === 'development') {
 				logger.info('Environment: development');
-				logger.info(`Health check: http://localhost:${PORT}/health`);
+				logger.info(`Health check: http://localhost:${PORT}/ai/health`);
 			}
 
 			if (server) {

@@ -1,5 +1,6 @@
 import express, {
-	type Express,
+	type Application,
+	Router,
 	type Response,
 	type Request,
 	type NextFunction
@@ -160,28 +161,39 @@ const RequestSchema = z.object({
 });
 
 /**
- * Create Express application
+ * Create Express application or mount to existing one
+ * Following jodit-nodejs pattern for integration
+ * @param config - App configuration
+ * @param existingApp - Optional existing Express app to mount routes to
+ * @param existingRouter - Optional existing Router to use
  */
-export function createApp(config: AppConfig): Express {
-	const app = express();
+export function createApp(
+	config: AppConfig,
+	existingApp?: Application,
+	existingRouter?: Router
+): Application {
+	const app = existingApp || express();
+	const router = existingRouter || Router();
 
-	// Store config in app locals
-	app.locals.config = config;
+	// Store config in router closure (not app.locals for isolation)
+	const appConfig = config;
 
-	// Basic middleware
-	app.use(express.json({ limit: '10mb' }) as express.RequestHandler);
-	app.use(
-		express.urlencoded({
-			extended: true,
-			limit: '10mb'
-		}) as express.RequestHandler
-	);
+	// Basic middleware (only if creating new app)
+	if (!existingApp) {
+		app.use(express.json({ limit: '10mb' }) as express.RequestHandler);
+		app.use(
+			express.urlencoded({
+				extended: true,
+				limit: '10mb'
+			}) as express.RequestHandler
+		);
+	}
 
-	// CORS middleware
-	app.use(corsMiddleware(config));
+	// CORS middleware on router (not app)
+	router.use(corsMiddleware(appConfig));
 
 	// Health check endpoint (no auth required)
-	app.get(
+	router.get(
 		'/health',
 		(_req: Request, res: Response): void => {
 			res.json({
@@ -193,31 +205,31 @@ export function createApp(config: AppConfig): Express {
 	);
 
 	// Apply authentication middleware to all routes except health check
-	app.use(authMiddleware(config));
+	router.use(authMiddleware(appConfig));
 
 	// Rate limiting middleware (after auth, so we can use userId)
-	if (config.rateLimit?.enabled) {
+	if (appConfig.rateLimit?.enabled) {
 		try {
 			const rateLimiter = RateLimiterFactory.create(
-				config.rateLimit.type,
+				appConfig.rateLimit.type,
 				{
-					maxRequests: config.rateLimit.maxRequests,
-					windowMs: config.rateLimit.windowMs,
-					keyPrefix: config.rateLimit.keyPrefix,
-					redisUrl: config.rateLimit.redisUrl,
+					maxRequests: appConfig.rateLimit.maxRequests,
+					windowMs: appConfig.rateLimit.windowMs,
+					keyPrefix: appConfig.rateLimit.keyPrefix,
+					redisUrl: appConfig.rateLimit.redisUrl,
 					redisOptions: {
-						password: config.rateLimit.redisPassword,
-						db: config.rateLimit.redisDb
+						password: appConfig.rateLimit.redisPassword,
+						db: appConfig.rateLimit.redisDb
 					}
 				}
 			);
 
-			app.use(createRateLimitMiddleware(rateLimiter));
+			router.use(createRateLimitMiddleware(rateLimiter));
 
 			logger.info('Rate limiting enabled', {
-				type: config.rateLimit.type,
-				maxRequests: config.rateLimit.maxRequests,
-				windowMs: config.rateLimit.windowMs
+				type: appConfig.rateLimit.type,
+				maxRequests: appConfig.rateLimit.maxRequests,
+				windowMs: appConfig.rateLimit.windowMs
 			});
 
 			// Cleanup on app close
@@ -235,11 +247,11 @@ export function createApp(config: AppConfig): Express {
 	}
 
 	// Image generation routes
-	app.use('/image', imageGenerateRouter);
+	router.use('/image', imageGenerateRouter);
 
 	// Main AI request endpoint
-	app.post(
-		'/ai/request',
+	router.post(
+		'/request',
 		asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
 			// Validate request body
 			const parseResult = RequestSchema.safeParse(req.body);
@@ -258,7 +270,7 @@ export function createApp(config: AppConfig): Express {
 			}
 
 			// Check if provider is configured
-			const providerConfig = config.providers[provider];
+			const providerConfig = appConfig.providers[provider];
 			if (!providerConfig) {
 				throw Boom.badRequest(`Provider not configured: ${provider}`);
 			}
@@ -277,7 +289,7 @@ export function createApp(config: AppConfig): Express {
 			const abortController = new AbortController();
 			const timeoutId = setTimeout(() => {
 				abortController.abort();
-			}, config.requestTimeout);
+			}, appConfig.requestTimeout);
 
 			const startTime = Date.now();
 
@@ -320,8 +332,8 @@ export function createApp(config: AppConfig): Express {
 					res.end();
 
 					// Track usage after stream completes
-					if (finalResponse && config.onUsage) {
-						await trackUsage(config, {
+					if (finalResponse && appConfig.onUsage) {
+						await trackUsage(appConfig, {
 							userId: req.userId || 'anonymous',
 							apiKey: userApiKey,
 							provider,
@@ -340,8 +352,8 @@ export function createApp(config: AppConfig): Express {
 					});
 
 					// Track usage for non-streaming response
-					if (config.onUsage) {
-						await trackUsage(config, {
+					if (appConfig.onUsage) {
+						await trackUsage(appConfig, {
 							userId: req.userId || 'anonymous',
 							apiKey: userApiKey,
 							provider,
@@ -360,11 +372,11 @@ export function createApp(config: AppConfig): Express {
 	);
 
 	// Provider info endpoint
-	app.get(
-		'/ai/providers',
+	router.get(
+		'/providers',
 		asyncHandler(
 			async (_req: Request, res: Response): Promise<void> => {
-				const providersInfo = Object.entries(config.providers).map(
+				const providersInfo = Object.entries(appConfig.providers).map(
 					([name, providerConfig]) => ({
 						name,
 						type: providerConfig.type,
@@ -383,7 +395,7 @@ export function createApp(config: AppConfig): Express {
 	);
 
 	// Error handler
-	app.use(
+	router.use(
 		(
 			err: Error | Boom.Boom,
 			req: AuthenticatedRequest,
@@ -421,6 +433,9 @@ export function createApp(config: AppConfig): Express {
 			}
 		}
 	);
+
+	// Mount router to app at /ai path
+	app.use('/ai', router);
 
 	return app;
 }
