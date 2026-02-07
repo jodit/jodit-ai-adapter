@@ -4,6 +4,7 @@ import {
 	createTestApp,
 	authHeader,
 	mockFixture,
+	mockStreamingFixture,
 	OPENAI_BASE
 } from '../__tests__/setup.js';
 
@@ -123,6 +124,114 @@ describe('POST /ai/request', () => {
 		expect(res.body.result.toolCalls).toHaveLength(1);
 		expect(res.body.result.toolCalls[0].name).toBe('get_weather');
 		expect(res.body.result.toolCalls[0].arguments).toEqual({
+			location: 'London'
+		});
+	});
+
+	it('should stream SSE events for streaming request', async () => {
+		mockStreamingFixture('openai', 'text-generation-streaming');
+
+		const res = await request(app)
+			.post('/ai/request')
+			.set(authHeader())
+			.send({
+				provider: 'openai',
+				context: {
+					mode: 'full',
+					messages: [
+						{
+							id: 'msg-1',
+							role: 'user',
+							content: 'Say "Hello, test!" and nothing else.',
+							timestamp: Date.now()
+						}
+					],
+					tools: [],
+					instructions: 'You are a test assistant. Reply very briefly.',
+					metadata: { stream: true }
+				}
+			});
+
+		expect(res.status).toBe(200);
+		expect(res.headers['content-type']).toContain('text/event-stream');
+
+		// Parse SSE events from response text
+		const sseBlocks = res.text.split('\n\n').filter(Boolean);
+		const events = sseBlocks.map(block => {
+			const lines = block.split('\n');
+			const eventLine = lines.find(l => l.startsWith('event: '));
+			const dataLine = lines.find(l => l.startsWith('data: '));
+			return {
+				type: eventLine?.slice(7),
+				data: dataLine ? JSON.parse(dataLine.slice(6)) : null
+			};
+		});
+
+		const types = events.map(e => e.type);
+		expect(types[0]).toBe('created');
+		expect(types).toContain('text-delta');
+		expect(types[types.length - 1]).toBe('completed');
+
+		const completed = events.find(e => e.type === 'completed');
+		expect(completed?.data.response.content).toBe('Hello, test!');
+		expect(completed?.data.response.finished).toBe(true);
+	});
+
+	it('should stream tool calls via SSE', async () => {
+		mockStreamingFixture('openai', 'text-with-tools-streaming');
+
+		const res = await request(app)
+			.post('/ai/request')
+			.set(authHeader())
+			.send({
+				provider: 'openai',
+				context: {
+					mode: 'full',
+					messages: [
+						{
+							id: 'msg-1',
+							role: 'user',
+							content: 'What is the weather in London?',
+							timestamp: Date.now()
+						}
+					],
+					tools: [
+						{
+							name: 'get_weather',
+							description: 'Get the current weather for a location',
+							parameters: [
+								{
+									name: 'location',
+									type: 'string',
+									description: 'The city name',
+									required: true
+								}
+							]
+						}
+					],
+					instructions: 'You must use the get_weather tool to answer weather questions.',
+					metadata: { stream: true }
+				}
+			});
+
+		expect(res.status).toBe(200);
+		expect(res.headers['content-type']).toContain('text/event-stream');
+
+		const sseBlocks = res.text.split('\n\n').filter(Boolean);
+		const events = sseBlocks.map(block => {
+			const lines = block.split('\n');
+			const eventLine = lines.find(l => l.startsWith('event: '));
+			const dataLine = lines.find(l => l.startsWith('data: '));
+			return {
+				type: eventLine?.slice(7),
+				data: dataLine ? JSON.parse(dataLine.slice(6)) : null
+			};
+		});
+
+		const completed = events.find(e => e.type === 'completed');
+		expect(completed?.data.response.toolCalls).toHaveLength(1);
+		expect(completed?.data.response.toolCalls[0].name).toBe('get_weather');
+		expect(completed?.data.response.toolCalls[0].arguments).toEqual({
 			location: 'London'
 		});
 	});

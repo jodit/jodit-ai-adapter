@@ -1,6 +1,7 @@
 import nock from 'nock';
 import fs from 'node:fs';
 import path from 'node:path';
+import { PassThrough } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import type { Application } from 'express';
 import type { AppConfig } from '../../types/index.js';
@@ -39,6 +40,45 @@ export function mockFixture(provider: string, name: string) {
 		.post(url.pathname)
 		.reply(fixture.response.status, fixture.response.body);
 	return { scope, fixture };
+}
+
+/**
+ * Load a raw SSE fixture (.txt) and return the text split into event blocks.
+ */
+export function loadStreamingFixture(provider: string, name: string): string[] {
+	const filePath = path.join(FIXTURES_DIR, provider, `${name}.txt`);
+	const raw = fs.readFileSync(filePath, 'utf-8');
+	return raw.split('\n\n').filter(Boolean);
+}
+
+/**
+ * Set up a nock interceptor that streams SSE events chunk-by-chunk
+ * from a captured .txt fixture.
+ */
+export function mockStreamingFixture(provider: string, name: string) {
+	const events = loadStreamingFixture(provider, name);
+
+	const scope = nock(OPENAI_BASE)
+		.post('/v1/responses')
+		.reply(200, () => {
+			const stream = new PassThrough();
+
+			let i = 0;
+			const push = () => {
+				if (i < events.length) {
+					stream.write(events[i] + '\n\n');
+					i++;
+					setTimeout(push, 1);
+				} else {
+					stream.end();
+				}
+			};
+			push();
+
+			return stream;
+		}, { 'Content-Type': 'text/event-stream' });
+
+	return { scope, events };
 }
 
 /**

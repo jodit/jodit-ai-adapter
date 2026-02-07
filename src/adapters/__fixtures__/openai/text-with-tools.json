@@ -46,15 +46,15 @@
 	"response": {
 		"status": 200,
 		"body": {
-			"id": "resp_006cbf242652b03d006986e880bbd48198afc563ce30af7669",
+			"id": "resp_07aee93a6a37500f0069872930b348819685c87ee7c56778c7",
 			"object": "response",
-			"created_at": 1770449024,
+			"created_at": 1770465584,
 			"status": "completed",
 			"background": false,
 			"billing": {
 				"payer": "openai"
 			},
-			"completed_at": 1770449025,
+			"completed_at": 1770465585,
 			"error": null,
 			"frequency_penalty": 0,
 			"incomplete_details": null,
@@ -64,11 +64,11 @@
 			"model": "gpt-4.1-nano-2025-04-14",
 			"output": [
 				{
-					"id": "fc_006cbf242652b03d006986e881ec7c8198afa18a56eac86ebe",
+					"id": "fc_07aee93a6a37500f006987293176e481969b490fcfac618e7e",
 					"type": "function_call",
 					"status": "completed",
 					"arguments": "{\"location\":\"London\"}",
-					"call_id": "call_tx63PoACHn3hNvdTMzXrtzxI",
+					"call_id": "call_av3Ob12Nh1OrAE8HI3iIkTDM",
 					"name": "get_weather"
 				}
 			],

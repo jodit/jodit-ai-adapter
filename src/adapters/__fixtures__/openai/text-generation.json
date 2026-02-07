@@ -26,15 +26,15 @@
 	"response": {
 		"status": 200,
 		"body": {
-			"id": "resp_06996f2c4646193e006986e87f1b288199aa16d6fd3261c086",
+			"id": "resp_002a7a5feb78d356006987292f611481978ca289da9bfe4586",
 			"object": "response",
-			"created_at": 1770449023,
+			"created_at": 1770465583,
 			"status": "completed",
 			"background": false,
 			"billing": {
 				"payer": "openai"
 			},
-			"completed_at": 1770449024,
+			"completed_at": 1770465584,
 			"error": null,
 			"frequency_penalty": 0,
 			"incomplete_details": null,
@@ -44,7 +44,7 @@
 			"model": "gpt-4.1-nano-2025-04-14",
 			"output": [
 				{
-					"id": "msg_06996f2c4646193e006986e88022548199a617eb5cf8f6864b",
+					"id": "msg_002a7a5feb78d35600698729301d008197853e121214639445",
 					"type": "message",
 					"status": "completed",
 					"content": [

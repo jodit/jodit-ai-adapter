@@ -27,7 +27,8 @@ interface CapturedFixture {
 	};
 	response: {
 		status: number;
-		body: unknown;
+		body?: unknown;
+		headers?: Record<string, string>;
 	};
 }
 
@@ -58,45 +59,71 @@ function createCapturingFetch(
 
 		// Clone so we can read the body without consuming it
 		const cloned = response.clone();
-		let responseBody: unknown;
+		const contentType = response.headers.get('content-type') || '';
 
-		try {
-			responseBody = await cloned.json();
-		} catch {
-			responseBody = await cloned.text();
+		console.log(`← ${response.status} (${contentType})`);
+
+		if (contentType.includes('text/event-stream')) {
+			// SSE streaming response — save raw text as-is
+			const text = await cloned.text();
+			const lineCount = text.split('\n').length;
+			console.log(`  SSE stream: ${text.length} bytes, ${lineCount} lines`);
+
+			captures.push({
+				request: { url, method, body: requestBody },
+				response: {
+					status: response.status,
+					headers: { 'content-type': contentType },
+					body: text
+				}
+			});
+		} else {
+			// JSON response
+			let responseBody: unknown;
+			try {
+				responseBody = await cloned.json();
+			} catch {
+				responseBody = await cloned.text();
+			}
+
+			const bodyStr = JSON.stringify(responseBody, null, 2);
+			console.log('  Response body:', bodyStr.substring(0, 500), bodyStr.length > 500 ? '...' : '');
+
+			captures.push({
+				request: { url, method, body: requestBody },
+				response: { status: response.status, body: responseBody }
+			});
 		}
-
-		console.log(`← ${response.status}`);
-		const bodyStr = JSON.stringify(responseBody, null, 2);
-		console.log('  Response body:', bodyStr.substring(0, 500), bodyStr.length > 500 ? '...' : '');
-
-		captures.push({
-			request: { url, method, body: requestBody },
-			response: { status: response.status, body: responseBody }
-		});
 
 		return response;
 	};
 }
 
 function saveFixture(name: string, fixture: CapturedFixture) {
-	const filePath = path.join(FIXTURES_DIR, `${name}.json`);
+	const isSSE = fixture.response.headers?.['content-type']?.includes('text/event-stream');
 
-	// Truncate large base64 image data for readability but keep structure
-	const cleaned = JSON.parse(JSON.stringify(fixture));
+	if (isSSE) {
+		// Save raw SSE stream as .txt
+		const filePath = path.join(FIXTURES_DIR, `${name}.txt`);
+		fs.writeFileSync(filePath, fixture.response.body as string);
+		console.log(`\n✓ Saved SSE fixture: ${filePath}`);
+	} else {
+		// Save JSON fixture
+		const filePath = path.join(FIXTURES_DIR, `${name}.json`);
+		const cleaned = JSON.parse(JSON.stringify(fixture));
 
-	// Trim b64 data in image responses to keep fixtures small
-	if (cleaned.response?.body?.data) {
-		for (const item of cleaned.response.body.data) {
-			if (item.b64_json && item.b64_json.length > 200) {
-				// Keep first 100 chars + marker so tests can still match structure
-				item.b64_json = item.b64_json.substring(0, 100) + '...TRUNCATED_FOR_FIXTURE';
+		// Trim b64 data in image responses to keep fixtures small
+		if (cleaned.response?.body?.data) {
+			for (const item of cleaned.response.body.data) {
+				if (item.b64_json && item.b64_json.length > 200) {
+					item.b64_json = item.b64_json.substring(0, 100) + '...TRUNCATED_FOR_FIXTURE';
+				}
 			}
 		}
-	}
 
-	fs.writeFileSync(filePath, JSON.stringify(cleaned, null, '\t'));
-	console.log(`\n✓ Saved fixture: ${filePath}`);
+		fs.writeFileSync(filePath, JSON.stringify(cleaned, null, '\t'));
+		console.log(`\n✓ Saved fixture: ${filePath}`);
+	}
 }
 
 async function main() {
@@ -213,9 +240,126 @@ async function main() {
 		globalThis.fetch = origFetch2;
 	}
 
-	// --- Scenario 3: Image generation ---
+	// --- Scenario 3: Streaming text generation ---
 	console.log('\n' + '='.repeat(60));
-	console.log('SCENARIO 3: Image generation');
+	console.log('SCENARIO 3: Streaming text generation');
+	console.log('='.repeat(60));
+
+	const captures3s: CapturedFixture[] = [];
+	const origFetch3s = globalThis.fetch;
+	globalThis.fetch = createCapturingFetch(origFetch3s, captures3s);
+
+	try {
+		const adapter3s = new OpenAIAdapter({
+			apiKey,
+			httpProxy,
+			defaultModel: 'gpt-4.1-nano'
+		});
+
+		const result3s = await adapter3s.handleRequest(
+			{
+				mode: 'full' as const,
+				messages: [
+					{
+						id: 'msg-1',
+						role: 'user' as const,
+						content: 'Say "Hello, test!" and nothing else.',
+						timestamp: Date.now()
+					}
+				],
+				tools: [],
+				instructions: 'You are a test assistant. Reply very briefly.',
+				metadata: { stream: true }
+			},
+			new AbortController().signal
+		);
+
+		// Consume stream to completion
+		if (result3s.mode === 'stream') {
+			for await (const event of result3s.stream) {
+				console.log(`  stream event: ${event.type}`);
+			}
+		} else {
+			console.log('\nAdapter result:', JSON.stringify(result3s, null, 2).substring(0, 500));
+		}
+
+		if (captures3s.length > 0) {
+			saveFixture('text-generation-streaming', captures3s[0]);
+		}
+	} catch (err) {
+		console.error('Scenario 3 (streaming) failed:', err);
+	} finally {
+		globalThis.fetch = origFetch3s;
+	}
+
+	// --- Scenario 4: Streaming text with tools ---
+	console.log('\n' + '='.repeat(60));
+	console.log('SCENARIO 4: Streaming text with tool calls');
+	console.log('='.repeat(60));
+
+	const captures4s: CapturedFixture[] = [];
+	const origFetch4s = globalThis.fetch;
+	globalThis.fetch = createCapturingFetch(origFetch4s, captures4s);
+
+	try {
+		const adapter4s = new OpenAIAdapter({
+			apiKey,
+			httpProxy,
+			defaultModel: 'gpt-4.1-nano'
+		});
+
+		const result4s = await adapter4s.handleRequest(
+			{
+				mode: 'full' as const,
+				messages: [
+					{
+						id: 'msg-1',
+						role: 'user' as const,
+						content: 'What is the weather in London?',
+						timestamp: Date.now()
+					}
+				],
+				tools: [
+					{
+						name: 'get_weather',
+						description: 'Get the current weather for a location',
+						parameters: [
+							{
+								name: 'location',
+								type: 'string' as const,
+								description: 'The city name',
+								required: true
+							}
+						]
+					}
+				],
+				instructions: 'You must use the get_weather tool to answer weather questions.',
+				metadata: { stream: true }
+			},
+			new AbortController().signal
+		);
+
+		// Consume stream to completion
+		if (result4s.mode === 'stream') {
+			for await (const event of result4s.stream) {
+				console.log(`  stream event: ${event.type}`);
+			}
+		} else {
+			console.log('\nAdapter result:', JSON.stringify(result4s, null, 2).substring(0, 500));
+		}
+
+		if (captures4s.length > 0) {
+			saveFixture('text-with-tools-streaming', captures4s[0]);
+		}
+	} catch (err) {
+		console.error('Scenario 4 (streaming) failed:', err);
+	} finally {
+		globalThis.fetch = origFetch4s;
+	}
+
+	// --- Scenario 5: Image generation ---
+	console.log('\n' + '='.repeat(60));
+	console.log('SCENARIO 5: Image generation');
 	console.log('='.repeat(60));
 
 	const captures3: CapturedFixture[] = [];
@@ -250,9 +394,9 @@ async function main() {
 		globalThis.fetch = origFetch3;
 	}
 
-	// --- Scenario 4: Error response (bad model) ---
+	// --- Scenario 6: Error response (bad key) ---
 	console.log('\n' + '='.repeat(60));
-	console.log('SCENARIO 4: Error response');
+	console.log('SCENARIO 6: Error response');
 	console.log('='.repeat(60));
 
 	const captures4: CapturedFixture[] = [];

@@ -1,9 +1,11 @@
+import { jest } from '@jest/globals';
 import nock from 'nock';
 import fs from 'node:fs';
 import path from 'node:path';
+import { PassThrough } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { OpenAIAdapter } from './openai-adapter.js';
-import type { IAIRequestContext } from '../types/index.js';
+import type { IAIRequestContext, AIStreamEvent } from '../types/index.js';
 import type { JSONSchema7TypeName } from 'json-schema';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -11,6 +13,32 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 function loadFixture(name: string) {
 	const filePath = path.join(__dirname, '__fixtures__', 'openai', `${name}.json`);
 	return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+}
+
+function mockStreamingFixture(name: string) {
+	const filePath = path.join(__dirname, '__fixtures__', 'openai', `${name}.txt`);
+	const raw = fs.readFileSync(filePath, 'utf-8');
+	const events = raw.split('\n\n').filter(Boolean);
+
+	const scope = nock(OPENAI_BASE)
+		.post('/v1/responses')
+		.reply(200, () => {
+			const stream = new PassThrough();
+			let i = 0;
+			const push = () => {
+				if (i < events.length) {
+					stream.write(events[i] + '\n\n');
+					i++;
+					setTimeout(push, 1);
+				} else {
+					stream.end();
+				}
+			};
+			push();
+			return stream;
+		}, { 'Content-Type': 'text/event-stream' });
+
+	return { scope, events };
 }
 
 const OPENAI_BASE = 'https://api.openai.com';
@@ -297,6 +325,171 @@ describe('OpenAIAdapter', () => {
 			);
 
 			expect(scope.isDone()).toBe(true);
+		});
+	});
+
+	describe('streaming', () => {
+		async function collectStream(stream: AsyncGenerator<AIStreamEvent>): Promise<AIStreamEvent[]> {
+			const events: AIStreamEvent[] = [];
+			for await (const event of stream) {
+				events.push(event);
+			}
+			return events;
+		}
+
+		it('should stream text generation', async () => {
+			mockStreamingFixture('text-generation-streaming');
+
+			const adapter = new OpenAIAdapter({
+				apiKey: mockApiKey,
+				defaultModel: 'gpt-4.1-nano'
+			});
+
+			const context: IAIRequestContext = {
+				mode: 'full',
+				messages: [
+					{
+						id: 'msg-1',
+						role: 'user',
+						content: 'Say "Hello, test!" and nothing else.',
+						timestamp: Date.now()
+					}
+				],
+				tools: [],
+				instructions: 'You are a test assistant. Reply very briefly.',
+				metadata: { stream: true }
+			};
+
+			const result = await adapter.handleRequest(
+				context,
+				new AbortController().signal
+			);
+
+			expect(result.mode).toBe('stream');
+			if (result.mode !== 'stream') return;
+
+			const events = await collectStream(result.stream);
+
+			expect(events[0].type).toBe('created');
+
+			const deltas = events.filter(e => e.type === 'text-delta');
+			expect(deltas.length).toBeGreaterThan(0);
+			const fullText = deltas
+				.map(e => e.type === 'text-delta' ? e.delta : '')
+				.join('');
+			expect(fullText).toBe('Hello, test!');
+
+			const completed = events.find(e => e.type === 'completed');
+			expect(completed).toBeDefined();
+			if (completed?.type === 'completed') {
+				expect(completed.response.content).toBe('Hello, test!');
+				expect(completed.response.finished).toBe(true);
+				expect(completed.response.metadata?.usage).toBeDefined();
+			}
+		});
+
+		it('should stream tool calls', async () => {
+			mockStreamingFixture('text-with-tools-streaming');
+
+			const adapter = new OpenAIAdapter({
+				apiKey: mockApiKey,
+				defaultModel: 'gpt-4.1-nano'
+			});
+
+			const context: IAIRequestContext = {
+				mode: 'full',
+				messages: [
+					{
+						id: 'msg-1',
+						role: 'user',
+						content: 'What is the weather in London?',
+						timestamp: Date.now()
+					}
+				],
+				tools: [
+					{
+						name: 'get_weather',
+						description: 'Get the current weather for a location',
+						parameters: [
+							{
+								name: 'location',
+								type: 'string' as JSONSchema7TypeName,
+								description: 'The city name',
+								required: true
+							}
+						]
+					}
+				],
+				instructions: 'You must use the get_weather tool to answer weather questions.',
+				metadata: { stream: true }
+			};
+
+			const result = await adapter.handleRequest(
+				context,
+				new AbortController().signal
+			);
+
+			expect(result.mode).toBe('stream');
+			if (result.mode !== 'stream') return;
+
+			const events = await collectStream(result.stream);
+
+			const completed = events.find(e => e.type === 'completed');
+			expect(completed).toBeDefined();
+			if (completed?.type === 'completed') {
+				expect(completed.response.toolCalls).toHaveLength(1);
+				expect(completed.response.toolCalls?.[0].name).toBe('get_weather');
+				expect(completed.response.toolCalls?.[0].arguments).toEqual({
+					location: 'London'
+				});
+				expect(completed.response.finished).toBe(true);
+			}
+		});
+
+		it('should yield error event on API failure', async () => {
+			nock(OPENAI_BASE)
+				.post('/v1/responses')
+				.reply(401, {
+					error: {
+						message: 'Incorrect API key',
+						type: 'invalid_request_error',
+						code: 'invalid_api_key'
+					}
+				});
+
+			const adapter = new OpenAIAdapter({ apiKey: 'bad-key' });
+
+			const context: IAIRequestContext = {
+				mode: 'full',
+				messages: [
+					{ id: 'msg-1', role: 'user', content: 'Hi', timestamp: Date.now() }
+				],
+				tools: [],
+				metadata: { stream: true }
+			};
+
+			// Suppress Vercel AI SDK's internal console.error for the 401
+			const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+			const result = await adapter.handleRequest(
+				context,
+				new AbortController().signal
+			);
+
+			// streamText returns lazily — error surfaces when consuming the stream
+			if (result.mode === 'stream') {
+				const events = await collectStream(result.stream);
+				const errorEvent = events.find(e => e.type === 'error');
+				expect(errorEvent).toBeDefined();
+				if (errorEvent?.type === 'error') {
+					expect(errorEvent.error).toBeInstanceOf(Error);
+				}
+			} else {
+				// If handleRequest catches early, it returns a final error
+				expect(result.response.metadata?.error).toBe(true);
+			}
+
+			spy.mockRestore();
 		});
 	});
 

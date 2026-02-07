@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.23]
+
+### Added
+- Streaming text generation via `streamText` (SSE) with `metadata: { stream: true }`
+- Streaming SSE fixtures captured from real OpenAI Responses API
+- Streaming tests for adapter and request handler (text, tool calls, error handling)
+- Fixture capture script now supports SSE streaming responses
+
 ## [0.1.22]
 
 ### Changed

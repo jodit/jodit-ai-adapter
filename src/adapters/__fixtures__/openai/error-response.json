@@ -19,14 +19,15 @@
 		}
 	},
 	"response": {
-		"status": 403,
+		"status": 401,
 		"body": {
 			"error": {
-				"code": "unsupported_country_region_territory",
-				"message": "Country, region, or territory not supported",
-				"param": null,
-				"type": "request_forbidden"
-			}
+				"message": "Incorrect API key provided: sk-inval**************ting. You can find your API key at https://platform.openai.com/account/api-keys.",
+				"type": "invalid_request_error",
+				"code": "invalid_api_key",
+				"param": null
+			},
+			"status": 401
 		}
 	}
 }
