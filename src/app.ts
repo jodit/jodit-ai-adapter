@@ -13,8 +13,8 @@ import { RateLimiterFactory } from './rate-limiter';
 import { logger } from './helpers/logger';
 import healthRouter from './routes/health';
 import { createImageGenerateRouter } from './routes/image-generate';
-import { createAiRequestRouter } from './routes/ai-request';
-import { createAiProvidersRouter } from './routes/ai-providers';
+import { createAiRequestRouter } from './routes/request';
+import { createAiProvidersRouter } from './routes/providers';
 
 /**
  * Create Express application or mount to existing one
@@ -137,8 +137,8 @@ export function createApp(
 		}
 	);
 
-	// Mount router to app at /ai path
-	app.use('/ai', router);
+	// Mount router to app at configured prefix
+	app.use(config.routePrefix ?? '/ai', router);
 
 	return app;
 }

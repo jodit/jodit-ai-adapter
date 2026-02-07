@@ -12,6 +12,7 @@ export const defaultConfig: AppConfig = {
 	requestTimeout: 120000, // 2 minutes
 	maxRetries: 3,
 	corsOrigin: process.env.CORS_ORIGIN || '*',
+	routePrefix: process.env.ROUTE_PREFIX || '/ai',
 	requireReferer: false,
 	apiKeyPattern: /^[A-F0-9-]{36}$/i, // 36 characters: A-F, 0-9, hyphens
 	providers: {

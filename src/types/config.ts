@@ -70,6 +70,9 @@ export interface ProviderConfig {
 	/** Provider type */
 	type: AIProvider;
 
+	/** Whether the provider is enabled (default: true) */
+	enabled?: boolean;
+
 	/** API key (can be overridden by user's key) */
 	apiKey?: string;
 
@@ -151,6 +154,9 @@ export interface AppConfig {
 
 	/** Allowed referer patterns */
 	allowedReferers?: RegExp[];
+
+	/** Route prefix (default: '/ai') */
+	routePrefix?: string;
 
 	/** Rate limiter configuration */
 	rateLimit?: RateLimiterConfig;

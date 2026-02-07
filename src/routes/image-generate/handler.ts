@@ -36,9 +36,9 @@ export const imageGenerateHandler = (config: AppConfig) =>
 			throw Boom.badRequest(`Provider '${provider}' is not configured`);
 		}
 
-		// Create adapter via factory
-		if (!AdapterFactory.isProviderSupported(provider)) {
-			throw Boom.badRequest(`Unsupported provider: ${provider}`);
+		// Check if provider is supported and enabled
+		if (!AdapterFactory.isProviderSupported(provider, providerConfig)) {
+			throw Boom.badRequest(`Unsupported or disabled provider: ${provider}`);
 		}
 
 		const adapter = AdapterFactory.createAdapter(provider, providerConfig);

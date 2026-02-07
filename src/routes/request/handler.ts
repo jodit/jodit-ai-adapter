@@ -158,15 +158,15 @@ export const aiRequestHandler = (config: AppConfig) =>
 
 		const { provider, context } = parseResult.data;
 
-		// Check if provider is supported
-		if (!AdapterFactory.isProviderSupported(provider)) {
-			throw Boom.badRequest(`Unsupported provider: ${provider}`);
-		}
-
 		// Check if provider is configured
 		const providerConfig = config.providers[provider];
 		if (!providerConfig) {
 			throw Boom.badRequest(`Provider not configured: ${provider}`);
+		}
+
+		// Check if provider is supported and enabled
+		if (!AdapterFactory.isProviderSupported(provider, providerConfig)) {
+			throw Boom.badRequest(`Unsupported or disabled provider: ${provider}`);
 		}
 
 		// Create adapter

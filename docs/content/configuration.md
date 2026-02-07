@@ -11,6 +11,7 @@
 | `RATE_LIMIT_ENABLED` | Enable rate limiting | `false` |
 | `RATE_LIMIT_TYPE` | Rate limiter type (`memory` or `redis`) | `memory` |
 | `REDIS_URL` | Redis connection URL | - |
+| `ROUTE_PREFIX` | Route prefix for all endpoints | `/ai` |
 | `CONFIG_FILE` | Path to JSON config file | - |
 
 ## Standalone Server
@@ -34,6 +35,7 @@ CONFIG_FILE=./config.json node -e "import('jodit-ai-adapter/run')"
 ```json
 {
   "port": 8082,
+  "routePrefix": "/ai",
   "providers": {
     "openai": {
       "type": "openai",
@@ -77,6 +79,7 @@ import { start } from 'jodit-ai-adapter';
 await start({
   port: 8082,
   config: {
+    routePrefix: '/api/v1',
     providers: {
       openai: {
         type: 'openai',

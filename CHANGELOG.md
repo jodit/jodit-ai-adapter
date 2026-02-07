@@ -5,9 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.18]
+## [0.1.21]
 
 ### Added
+- `enabled` option in `ProviderConfig` to disable providers via configuration
+- Configurable route prefix (`routePrefix` / `ROUTE_PREFIX` env var, default `/ai`)
 - Image generation endpoint (`POST /ai/image/generate`)
 - Fixture capturing script for OpenAI API requests/responses
 - Mermaid diagrams in architecture documentation
@@ -17,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Extracted generic Vercel AI SDK logic from `OpenAIAdapter` to `BaseAdapter`
 - `AdapterFactory` map type no longer tied to `OpenAIAdapter`
 - Removed `instanceof OpenAIAdapter` check from image generation handler
+- Moved `enabled` check into `AdapterFactory.isProviderSupported()`
+- Renamed route directories: `ai-request` → `request`, `ai-providers` → `providers`
 - Restructured documentation into separate pages
 
 ### Fixed

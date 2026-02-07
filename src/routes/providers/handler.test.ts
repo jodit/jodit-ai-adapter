@@ -24,4 +24,39 @@ describe('GET /ai/providers', () => {
 		});
 		expect(Array.isArray(res.body.supported)).toBe(true);
 	});
+
+	it('should not include disabled providers', async () => {
+		const appWithDisabled = createTestApp({
+			providers: {
+				openai: {
+					type: 'openai',
+					apiKey: 'test-key',
+					enabled: false
+				},
+				deepseek: {
+					type: 'deepseek',
+					apiKey: 'test-key',
+					enabled: true
+				}
+			}
+		});
+
+		const res = await request(appWithDisabled)
+			.get('/ai/providers')
+			.set(authHeader());
+
+		expect(res.status).toBe(200);
+		expect(res.body.providers).toHaveLength(1);
+		expect(res.body.providers[0].name).toBe('deepseek');
+	});
+
+	it('should include providers without explicit enabled field', async () => {
+		const res = await request(app)
+			.get('/ai/providers')
+			.set(authHeader());
+
+		expect(res.status).toBe(200);
+		expect(res.body.providers).toHaveLength(1);
+		expect(res.body.providers[0].name).toBe('openai');
+	});
 });

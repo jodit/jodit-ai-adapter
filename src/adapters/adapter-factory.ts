@@ -57,9 +57,17 @@ export class AdapterFactory {
 	}
 
 	/**
-	 * Check if provider is supported
+	 * Check if provider is supported and enabled
 	 */
-	static isProviderSupported(provider: string): provider is AIProvider {
-		return this.adapters.has(provider);
+	static isProviderSupported(provider: string, providerConfig?: ProviderConfig): provider is AIProvider {
+		if (!this.adapters.has(provider)) {
+			return false;
+		}
+
+		if (providerConfig?.enabled === false) {
+			return false;
+		}
+
+		return true;
 	}
 }

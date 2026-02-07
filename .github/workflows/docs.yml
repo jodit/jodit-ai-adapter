@@ -55,10 +55,6 @@ jobs:
       - name: Build MkDocs site
         working-directory: docs
         run: mkdocs build --clean
-    
-        
-      - name: Copy demo page
-        run: cp demo/index.html dist/site/demo.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

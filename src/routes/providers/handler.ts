@@ -9,14 +9,14 @@ import { AdapterFactory } from '../../adapters/adapter-factory';
  */
 export const aiProvidersHandler = (config: AppConfig) =>
 	asyncHandler(async (_req: Request, res: Response): Promise<void> => {
-		const providersInfo = Object.entries(config.providers).map(
-			([name, providerConfig]) => ({
+		const providersInfo = Object.entries(config.providers)
+			.filter(([, providerConfig]) => providerConfig.enabled !== false)
+			.map(([name, providerConfig]) => ({
 				name,
 				type: providerConfig.type,
 				defaultModel: providerConfig.defaultModel,
 				configured: !!providerConfig.apiKey
-			})
-		);
+			}));
 
 		res.json({
 			success: true,
