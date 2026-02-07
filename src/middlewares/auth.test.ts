@@ -37,7 +37,7 @@ describe('authMiddleware', () => {
 	describe('API key validation', () => {
 		it('should accept valid API key in Authorization header', async () => {
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789'
+				authorization: 'Bearer ABCDEF01-2345-6789-ABCD-EF0123456789'
 			};
 
 			const middleware = authMiddleware(mockConfig);
@@ -49,13 +49,13 @@ describe('authMiddleware', () => {
 
 			expect(mockNext).toHaveBeenCalled();
 			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
-				'ABCDEF0123456789ABCDEF0123456789'
+				'ABCDEF01-2345-6789-ABCD-EF0123456789'
 			);
 		});
 
 		it('should accept valid API key in x-api-key header', async () => {
 			mockReq.headers = {
-				'x-api-key': 'ABCDEF0123456789ABCDEF0123456789'
+				'x-api-key': 'ABCDEF01-2345-6789-ABCD-EF0123456789'
 			};
 
 			const middleware = authMiddleware(mockConfig);
@@ -67,13 +67,13 @@ describe('authMiddleware', () => {
 
 			expect(mockNext).toHaveBeenCalled();
 			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
-				'ABCDEF0123456789ABCDEF0123456789'
+				'ABCDEF01-2345-6789-ABCD-EF0123456789'
 			);
 		});
 
 		it('should accept valid API key in query parameter', async () => {
 			mockReq.query = {
-				apikey: 'ABCDEF0123456789ABCDEF0123456789'
+				apikey: 'ABCDEF01-2345-6789-ABCD-EF0123456789'
 			};
 
 			const middleware = authMiddleware(mockConfig);
@@ -85,16 +85,16 @@ describe('authMiddleware', () => {
 
 			expect(mockNext).toHaveBeenCalled();
 			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
-				'ABCDEF0123456789ABCDEF0123456789'
+				'ABCDEF01-2345-6789-ABCD-EF0123456789'
 			);
 		});
 
 		it('should prioritize Authorization header over query parameter', async () => {
 			mockReq.headers = {
-				authorization: 'Bearer AAAABBBBCCCCDDDDEEEEFFFF00001111'
+				authorization: 'Bearer AAAABBBB-CCCC-DDDD-EEEE-FFFF00001111'
 			};
 			mockReq.query = {
-				apikey: 'AAAABBBBCCCCDDDDEEEEFFFF00002222'
+				apikey: 'AAAABBBB-CCCC-DDDD-EEEE-FFFF00002222'
 			};
 
 			const middleware = authMiddleware(mockConfig);
@@ -106,16 +106,16 @@ describe('authMiddleware', () => {
 
 			expect(mockNext).toHaveBeenCalled();
 			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
-				'AAAABBBBCCCCDDDDEEEEFFFF00001111'
+				'AAAABBBB-CCCC-DDDD-EEEE-FFFF00001111'
 			);
 		});
 
 		it('should prioritize x-api-key header over query parameter', async () => {
 			mockReq.headers = {
-				'x-api-key': 'AAAABBBBCCCCDDDDEEEEFFFF00001111'
+				'x-api-key': 'AAAABBBB-CCCC-DDDD-EEEE-FFFF00001111'
 			};
 			mockReq.query = {
-				apikey: 'AAAABBBBCCCCDDDDEEEEFFFF00002222'
+				apikey: 'AAAABBBB-CCCC-DDDD-EEEE-FFFF00002222'
 			};
 
 			const middleware = authMiddleware(mockConfig);
@@ -127,7 +127,7 @@ describe('authMiddleware', () => {
 
 			expect(mockNext).toHaveBeenCalled();
 			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
-				'AAAABBBBCCCCDDDDEEEEFFFF00001111'
+				'AAAABBBB-CCCC-DDDD-EEEE-FFFF00001111'
 			);
 		});
 
@@ -195,7 +195,7 @@ describe('authMiddleware', () => {
 			};
 
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789'
+				authorization: 'Bearer ABCDEF01-2345-6789-ABCD-EF0123456789'
 			};
 
 			const middleware = authMiddleware(configWithReferer);
@@ -220,7 +220,7 @@ describe('authMiddleware', () => {
 			};
 
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789',
+				authorization: 'Bearer ABCDEF01-2345-6789-ABCD-EF0123456789',
 				referer: 'https://example.com/page'
 			};
 
@@ -242,7 +242,7 @@ describe('authMiddleware', () => {
 			};
 
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789',
+				authorization: 'Bearer ABCDEF01-2345-6789-ABCD-EF0123456789',
 				referer: 'https://evil.com/page'
 			};
 
@@ -268,7 +268,7 @@ describe('authMiddleware', () => {
 			};
 
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789',
+				authorization: 'Bearer ABCDEF01-2345-6789-ABCD-EF0123456789',
 				origin: 'https://example.com'
 			};
 
@@ -293,7 +293,7 @@ describe('authMiddleware', () => {
 			};
 
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789'
+				authorization: 'Bearer ABCDEF01-2345-6789-ABCD-EF0123456789'
 			};
 
 			const middleware = authMiddleware(configWithAuth);
@@ -304,7 +304,7 @@ describe('authMiddleware', () => {
 			);
 
 			expect(mockAuthCallback).toHaveBeenCalledWith(
-				'ABCDEF0123456789ABCDEF0123456789',
+				'ABCDEF01-2345-6789-ABCD-EF0123456789',
 				undefined,
 				mockReq
 			);
@@ -325,7 +325,7 @@ describe('authMiddleware', () => {
 			};
 
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789'
+				authorization: 'Bearer ABCDEF01-2345-6789-ABCD-EF0123456789'
 			};
 
 			const middleware = authMiddleware(configWithAuth);
@@ -351,7 +351,7 @@ describe('authMiddleware', () => {
 			};
 
 			mockReq.headers = {
-				authorization: 'Bearer ABCDEF0123456789ABCDEF0123456789'
+				authorization: 'Bearer ABCDEF01-2345-6789-ABCD-EF0123456789'
 			};
 
 			const middleware = authMiddleware(configWithAuth);
