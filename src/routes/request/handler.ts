@@ -199,7 +199,10 @@ export const aiRequestHandler = (config: AppConfig) =>
 
 				// Stream events
 				for await (const event of result.stream) {
-					const data = JSON.stringify(event);
+					const data = event.type === 'error' ? JSON.stringify({
+						type: 'error',
+						message: event.error.message,
+					}) : JSON.stringify(event);
 					res.write(`event: ${event.type}\n`);
 					res.write(`data: ${data}\n\n`);
 

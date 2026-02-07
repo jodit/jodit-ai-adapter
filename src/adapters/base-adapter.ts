@@ -1,10 +1,14 @@
 import {
 	tool,
+	generateText,
+	streamText,
 	ModelMessage,
 	ToolSet,
 	Schema,
 	jsonSchema,
-	JSONSchema7
+	JSONSchema7,
+	type LanguageModel,
+	type JSONValue
 } from 'ai';
 import type {
 	IAIRequestContext,
@@ -16,7 +20,8 @@ import type {
 	IToolParameter,
 	IToolCall,
 	IImageGenerationRequest,
-	IImageGenerationResponse
+	IImageGenerationResponse,
+	StreamTextParams
 } from '../types';
 import { logger } from '../helpers/logger';
 
@@ -65,19 +70,198 @@ export abstract class BaseAdapter {
 			// Delegate to provider-specific implementation
 			return await this.processRequest(context, signal);
 		} catch (error) {
-			logger.error('Error handling AI request:', error);
+			logger.error(error);
 			return this.handleError(error);
 		}
 	}
 
 	/**
-	 * Provider-specific request processing
-	 * Must be implemented by each provider adapter
+	 * Request processing — builds params and routes to streaming/non-streaming
+	 * Can be overridden by provider adapters for custom flow
 	 */
-	protected abstract processRequest(
+	protected async processRequest(
 		context: IAIRequestContext,
 		signal: AbortSignal
-	): Promise<IAIAssistantResult>;
+	): Promise<IAIAssistantResult> {
+		const model = this.resolveModel(context, this.getDefaultFallbackModel());
+		const messages = this.buildMessages(context);
+		const tools = this.buildTools(context.tools);
+
+		const commonParams: StreamTextParams = {
+			model: { modelId: model },
+			messages,
+			temperature: context.conversationOptions?.temperature,
+			maxOutputTokens: 4000,
+			abortSignal: signal,
+			...(Object.keys(tools).length > 0 ? { tools } : {})
+		};
+
+		if (context.metadata?.stream === true) {
+			return await this.handleStreaming(commonParams, context);
+		}
+
+		return await this.handleNonStreaming(commonParams, context);
+	}
+
+
+	/**
+	 * Generate a unique response ID
+	 */
+	protected generateResponseId(prefix: string = 'resp'): string {
+		return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+	}
+
+	/**
+	 * Handle streaming response using Vercel AI SDK streamText
+	 */
+	protected async handleStreaming(
+		params: StreamTextParams,
+		context: IAIRequestContext
+	): Promise<IAIAssistantResult> {
+		const result = streamText({
+			model: this.createLanguageModel(params.model.modelId),
+			messages: params.messages,
+			temperature: params.temperature,
+			abortSignal: params.abortSignal,
+			maxOutputTokens: params.maxOutputTokens,
+			tools: params.tools,
+			providerOptions: this.getProviderOptions(context)
+		});
+
+		const responseId = this.generateResponseId('stream');
+		const extractToolCalls = this.extractToolCalls.bind(this);
+		const modelId = params.model.modelId;
+
+		return {
+			mode: 'stream',
+			stream: (async function* (): AsyncGenerator<AIStreamEvent> {
+				let fullText = '';
+
+				try {
+					yield {
+						type: 'created',
+						response: {
+							responseId,
+							content: '',
+							finished: false
+						}
+					};
+
+					for await (const part of result.fullStream) {
+						switch (part.type) {
+							case 'text-delta': {
+								fullText += part.text;
+								yield {
+									type: 'text-delta',
+									delta: part.text
+								};
+								break;
+							}
+						}
+					}
+
+					const finalResponse = await result.response;
+					const resolvedToolCalls = await result.toolCalls;
+					const toolCalls = extractToolCalls({ toolCalls: resolvedToolCalls });
+
+					yield {
+						type: 'completed',
+						response: {
+							responseId: finalResponse.id || responseId,
+							content: fullText,
+							toolCalls,
+							finished: true,
+							metadata: {
+								model: modelId,
+								usage: await result.usage
+							}
+						}
+					};
+
+					logger.debug('Stream completed', {
+						responseId: finalResponse.id || responseId,
+						textLength: fullText.length,
+						toolCallsCount: toolCalls.length
+					});
+				} catch (error) {
+					logger.error('Streaming error:', error);
+					yield {
+						type: 'error',
+						error:
+							error instanceof Error
+								? error
+								: new Error(String(error))
+					};
+				}
+			})()
+		};
+	}
+
+	/**
+	 * Handle non-streaming response
+	 */
+	protected async handleNonStreaming(
+		params: StreamTextParams,
+		context: IAIRequestContext
+	): Promise<IAIAssistantResult> {
+		const result = await generateText({
+			model: this.createLanguageModel(params.model.modelId),
+			messages: params.messages,
+			temperature: params.temperature,
+			abortSignal: params.abortSignal,
+			maxOutputTokens: params.maxOutputTokens,
+			tools: params.tools,
+			providerOptions: this.getProviderOptions(context)
+		});
+
+		const responseId = result.response.id;
+		const extractedToolCalls = this.extractToolCalls(result);
+
+		const response: IAIResponse = {
+			responseId,
+			content: result.text,
+			toolCalls: extractedToolCalls,
+			finished: true,
+			metadata: {
+				model: params.model.modelId,
+				usage: result.usage
+			}
+		};
+
+		this.validateResponse(response);
+
+		logger.debug('Non-streaming response generated', {
+			responseId,
+			textLength: result.text.length,
+			toolCallsCount: extractedToolCalls?.length || 0
+		});
+
+		return {
+			mode: 'final',
+			response
+		};
+	}
+
+	/**
+	 * Create a language model instance for the given model ID
+	 * Must be implemented by each provider adapter
+	 */
+	protected abstract createLanguageModel(modelId: string): LanguageModel;
+
+	/**
+	 * Return the default fallback model ID for this provider
+	 */
+	protected abstract getDefaultFallbackModel(): string;
+
+	/**
+	 * Return provider-specific options for generateText/streamText
+	 * Override in provider adapters (e.g. { openai: { instructions: ... } })
+	 */
+	protected getProviderOptions(
+		_context: IAIRequestContext
+	): Record<string, Record<string, JSONValue | undefined>> {
+		return {};
+	}
 
 	/**
 	 * Generate images — default implementation throws "not supported"
@@ -113,13 +297,6 @@ export abstract class BaseAdapter {
 				}
 			}
 		};
-	}
-
-	/**
-	 * Generate a unique response ID
-	 */
-	protected generateResponseId(prefix: string = 'resp'): string {
-		return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 	}
 
 	/**
@@ -180,7 +357,6 @@ export abstract class BaseAdapter {
 	protected buildMessages(context: IAIRequestContext): ModelMessage[] {
 		const messages: ModelMessage[] = [];
 
-		// Add system instructions if provided
 		if (context.instructions) {
 			messages.push({
 				role: 'system',
@@ -188,14 +364,12 @@ export abstract class BaseAdapter {
 			});
 		}
 
-		// Add conversation messages
 		if (context.messages) {
 			for (const msg of context.messages) {
 				messages.push(...this.convertMessage(msg));
 			}
 		}
 
-		// Add selection contexts as user messages if any
 		if (context.selectionContexts && context.selectionContexts.length > 0) {
 			const contextText = context.selectionContexts
 				.map((ctx, idx) => `Context ${idx + 1}:\n${ctx.html}`)
@@ -217,7 +391,6 @@ export abstract class BaseAdapter {
 	protected convertMessage(message: IAIMessage): ModelMessage[] {
 		const result: ModelMessage[] = [];
 
-		// Handle tool result messages
 		if (message.role === 'tool' && message.toolResults) {
 			for (const toolResult of message.toolResults) {
 				result.push({
@@ -226,7 +399,7 @@ export abstract class BaseAdapter {
 						{
 							type: 'tool-result',
 							toolCallId: toolResult.toolCallId,
-							toolName: '', // Tool name is not provided in toolResults, can be enhanced if needed,
+							toolName: '',
 							output:
 								'error' in toolResult
 									? {
@@ -242,7 +415,6 @@ export abstract class BaseAdapter {
 			return result;
 		}
 
-		// Handle regular messages
 		if (message.content && message.role !== 'tool') {
 			const aiMessage: ModelMessage = {
 				role: message.role,

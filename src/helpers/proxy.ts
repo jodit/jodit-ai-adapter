@@ -10,7 +10,7 @@ export function createProxyFetch(proxyUrl: string): typeof fetch {
 	try {
 		const proxyAgent = new ProxyAgent(proxyUrl);
 
-		logger.debug('Created proxy agent', { proxyUrl });
+		logger.debug('Created proxy agent');
 
 		return (url: string | URL | Request, options?: RequestInit) => {
 			return fetch(url, {
