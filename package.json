@@ -1,7 +1,7 @@
 {
 	"name": "jodit-ai-adapter",
 	"displayName": "Jodit AI Assistant Adapter Service",
-	"version": "0.1.20",
+	"version": "0.1.21",
 	"description": "Universal AI adapter service for Jodit Editor AI Assistant Pro using Vercel AI SDK",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
