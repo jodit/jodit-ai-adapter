@@ -4,47 +4,35 @@ This document describes the architecture and design decisions of the Jodit AI Ad
 
 ## System Overview
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Client Side                              │
-│  ┌────────────────┐                                             │
-│  │ Jodit Editor   │                                             │
-│  │ AI Plugin      │                                             │
-│  └───────┬────────┘                                             │
-│          │ HTTPS (API Key in header)                            │
-└──────────┼──────────────────────────────────────────────────────┘
-           │
-           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Adapter Service                             │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐       │
-│  │ CORS         │→ │ Auth         │→ │ Request        │       │
-│  │ Middleware   │  │ Middleware   │  │ Handler        │       │
-│  └──────────────┘  └──────────────┘  └───────┬────────┘       │
-│                                               │                 │
-│                                               ▼                 │
-│                                    ┌─────────────────────┐     │
-│                                    │ Adapter Factory     │     │
-│                                    └──────────┬──────────┘     │
-│                                               │                 │
-│                ┌──────────────────────────────┼──────────┐     │
-│                │                              │          │     │
-│                ▼                              ▼          ▼     │
-│       ┌────────────────┐           ┌──────────────┐  ┌───┐   │
-│       │ OpenAI Adapter │           │ DeepSeek     │  │...│   │
-│       │ (Vercel AI SDK)│           │ Adapter      │  └───┘   │
-│       └───────┬────────┘           └──────────────┘           │
-│               │                                                │
-└───────────────┼────────────────────────────────────────────────┘
-                │ HTTPS
-                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    External AI Providers                         │
-│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐      │
-│   │ OpenAI   │  │ DeepSeek │  │ Anthropic│  │ Google   │      │
-│   └──────────┘  └──────────┘  └──────────┘  └──────────┘      │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Client Side
+        JoditEditor[Jodit Editor<br/>AI Plugin]
+    end
+
+    JoditEditor -->|HTTPS<br/>API Key in header| CORS
+
+    subgraph Adapter Service
+        CORS[CORS Middleware] --> Auth[Auth Middleware] --> Handler[Request Handler]
+        Handler --> Factory[Adapter Factory]
+        Factory --> OpenAI[OpenAI Adapter<br/>Vercel AI SDK]
+        Factory --> DeepSeek[DeepSeek Adapter]
+        Factory --> Other[...]
+    end
+
+    OpenAI -->|HTTPS| Providers
+    DeepSeek -->|HTTPS| Providers
+    Other -->|HTTPS| Providers
+
+    subgraph External AI Providers
+        Providers[" "]:::hidden
+        P1[OpenAI]
+        P2[DeepSeek]
+        P3[Anthropic]
+        P4[Google]
+    end
+
+    classDef hidden display:none
 ```
 
 ## Core Components
@@ -232,23 +220,18 @@ All errors converted to Boom errors with appropriate HTTP status codes.
 
 ### 1. API Key Management
 
-```
-Client                  Adapter Service          AI Provider
-  │                            │                      │
-  │ Request + API Key          │                      │
-  ├───────────────────────────►│                      │
-  │                            │ Validate Key         │
-  │                            │ (36 chars, UUID)     │
-  │                            │                      │
-  │                            │ Custom Auth          │
-  │                            │ (Optional)           │
-  │                            │                      │
-  │                            │ Provider Request     │
-  │                            │ (Provider API Key)   │
-  │                            ├─────────────────────►│
-  │                            │                      │
-  │                            │◄─────────────────────┤
-  │◄───────────────────────────┤                      │
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Adapter Service
+    participant AI Provider
+
+    Client->>Adapter Service: Request + API Key
+    Note over Adapter Service: Validate Key<br/>(36 chars, UUID)
+    Note over Adapter Service: Custom Auth<br/>(Optional)
+    Adapter Service->>AI Provider: Provider Request<br/>(Provider API Key)
+    AI Provider-->>Adapter Service: Response
+    Adapter Service-->>Client: Response
 ```
 
 **Key Points**:
@@ -395,23 +378,15 @@ describe('Component', () => {
 
 ### Docker Deployment
 
-```
-┌─────────────────────────────────────────┐
-│          Docker Container               │
-│  ┌──────────────────────────────────┐  │
-│  │   Node.js 22                     │  │
-│  │   ┌──────────────────────────┐   │  │
-│  │   │ Adapter Service          │   │  │
-│  │   │ Port: 8082               │   │  │
-│  │   └──────────────────────────┘   │  │
-│  └──────────────────────────────────┘  │
-└─────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────────┐
-│          Load Balancer                  │
-│          (nginx/traefik)                │
-└─────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Docker Container
+        subgraph Node.js 22
+            Service[Adapter Service<br/>Port: 8082]
+        end
+    end
+
+    Service --> LB[Load Balancer<br/>nginx / traefik]
 ```
 
 ### Environment Variables

@@ -11,158 +11,26 @@ This service provides a secure, server-side proxy for AI providers (OpenAI, Deep
 
 ## Features
 
-- 🔒 **Secure API Key Management** - API keys stored server-side, not exposed to clients
-- 🔑 **Authentication** - Validates API keys (36 characters, UUID format) and referer headers
-- 🌐 **Multi-Provider Support** - OpenAI, DeepSeek, Anthropic, Google (extensible)
-- 📡 **Streaming Support** - Real-time streaming responses using Server-Sent Events (SSE)
-- 🛠️ **Tool Calling** - Full support for function/tool calling
-- 🚦 **Rate Limiting** - Configurable rate limiting with in-memory or Redis backend
-- 🔄 **Distributed Support** - Redis-based rate limiting for multi-instance deployments
-- 🚀 **Production Ready** - Docker support, TypeScript, comprehensive error handling
-- 📊 **Logging** - Winston-based logging with different levels
-- 🧪 **Testing** - Jest with comprehensive test coverage
-
-## Quick Start
-
-### Installation
-
-```bash
-npm install jodit-ai-adapter
-```
-
-### Basic Usage
-
-```typescript
-import { start } from 'jodit-ai-adapter';
-
-await start({
-  port: 8082,
-  providers: {
-    openai: {
-      type: 'openai',
-      apiKey: process.env.OPENAI_API_KEY,
-      defaultModel: 'gpt-5.2'
-    }
-  }
-});
-```
-
-### Docker
-
-```bash
-docker build -t jodit-ai-adapter .
-docker run -p 8082:8082 --env-file .env jodit-ai-adapter
-```
+- **Secure API Key Management** - API keys stored server-side, not exposed to clients
+- **Authentication** - Validates API keys (36 characters, UUID format) and referer headers
+- **Multi-Provider Support** - OpenAI, DeepSeek, Anthropic, Google (extensible)
+- **Streaming Support** - Real-time streaming responses using Server-Sent Events (SSE)
+- **Tool Calling** - Full support for function/tool calling
+- **Rate Limiting** - Configurable rate limiting with in-memory or Redis backend
+- **Distributed Support** - Redis-based rate limiting for multi-instance deployments
+- **Production Ready** - Docker support, TypeScript, comprehensive error handling
+- **Logging** - Winston-based logging with different levels
+- **Testing** - Jest with comprehensive test coverage
 
 ## Documentation
 
+- [Quick Start](getting-started.md) - Install, configure, and run in minutes
+- [Configuration](configuration.md) - Environment variables and configuration file
+- [API Reference](api-reference.md) - All available endpoints
 - [Architecture](ARCHITECTURE.md) - System architecture and design
 - [Rate Limiting](rate-limiting.md) - Rate limiting configuration
 - [Client Integration](examples/client-integration.md) - Jodit Editor integration examples
 - [Usage Tracking](examples/usage-tracking.md) - Track AI usage and costs
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Server port | `8082` |
-| `NODE_ENV` | Environment mode | `development` |
-| `OPENAI_API_KEY` | OpenAI API key | - |
-| `OPENAI_DEFAULT_MODEL` | Default OpenAI model | `gpt-5.2` |
-| `RATE_LIMIT_ENABLED` | Enable rate limiting | `false` |
-| `RATE_LIMIT_TYPE` | Rate limiter type (`memory` or `redis`) | `memory` |
-| `REDIS_URL` | Redis connection URL | - |
-
-### Configuration File
-
-```json
-{
-  "port": 8082,
-  "providers": {
-    "openai": {
-      "type": "openai",
-      "apiKey": "sk-...",
-      "defaultModel": "gpt-5.2"
-    }
-  },
-  "rateLimit": {
-    "enabled": true,
-    "type": "memory",
-    "maxRequests": 100,
-    "windowMs": 60000
-  }
-}
-```
-
-## API Endpoints
-
-### Health Check
-
-```http
-GET /ai/health
-```
-
-Returns service status and available providers.
-
-### AI Request (Streaming)
-
-```http
-POST /ai/request
-Content-Type: application/json
-Authorization: Bearer 12345678-1234-1234-1234-123456789abc
-```
-
-**Request:**
-```json
-{
-  "provider": "openai",
-  "context": {
-    "mode": "full",
-    "messages": [
-      {
-        "id": "msg_1",
-        "role": "user",
-        "content": "Hello!",
-        "timestamp": 1234567890
-      }
-    ]
-  }
-}
-```
-
-**Response (SSE):**
-```
-event: created
-data: {"type":"created","response":{"responseId":"resp_123"}}
-
-event: text-delta
-data: {"type":"text-delta","delta":"Hello"}
-
-event: completed
-data: {"type":"completed","response":{"finished":true}}
-```
-
-### Image Generation
-
-```http
-POST /ai/image/generate
-Content-Type: application/json
-Authorization: Bearer 12345678-1234-1234-1234-123456789abc
-```
-
-**Request:**
-```json
-{
-  "provider": "openai",
-  "request": {
-    "prompt": "A white siamese cat with blue eyes",
-    "model": "dall-e-3",
-    "size": "1024x1024"
-  }
-}
-```
 
 ## License
 

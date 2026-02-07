@@ -191,6 +191,23 @@ npm run test:watch
 - Update inline comments for complex logic
 - Create examples in `docs/` directory
 
+### Local Documentation Server
+
+The project uses [MkDocs](https://www.mkdocs.org/) for documentation. To generate and preview docs locally:
+
+```bash
+# First-time setup (creates Python venv and installs dependencies)
+npm run docs:setup
+
+# Start local dev server with hot-reload
+npm run docs:serve
+
+# Build static site
+npm run docs:build
+```
+
+Deployment to GitHub Pages (`npm run docs:deploy`) is handled automatically by CI.
+
 ## Release Process
 
 1. Update version in `package.json`
