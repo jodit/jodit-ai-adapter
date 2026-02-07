@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  version: 0.1.10
+  version: 0.1.17
   title: jodit-ai-adapter
   description: Universal AI adapter service for Jodit Editor AI Assistant Pro
     using Vercel AI SDK
@@ -442,10 +442,6 @@ components:
             - incremental
           description: Request mode - full or incremental
           example: full
-        conversationId:
-          type: string
-          description: Conversation ID
-          example: conv-123
         messages:
           type: array
           items:
@@ -480,7 +476,6 @@ components:
             stream: true
       required:
         - mode
-        - conversationId
         - tools
       description: Request context
     AIRequest:
@@ -498,6 +493,40 @@ components:
         - context
   parameters: {}
 paths:
+  /ai/health:
+    get:
+      operationId: healthCheck
+      summary: Health check
+      description: Returns service status and available providers
+      tags:
+        - Health
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ok
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2025-01-22T10:30:00.000Z"
+                  providers:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                      - openai
+                required:
+                  - status
+                  - timestamp
+                  - providers
   /ai/providers:
     get:
       operationId: getProviders
@@ -530,7 +559,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /image/generate:
+  /ai/image/generate:
     post:
       operationId: imageGenerate
       summary: Generate images from text prompt

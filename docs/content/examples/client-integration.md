@@ -8,7 +8,7 @@ This document provides examples of integrating the Jodit AI Adapter service with
 import { Jodit } from 'jodit-pro';
 
 const ADAPTER_URL = 'http://localhost:8082';
-const API_KEY = 'ABCDEF0123456789-ABCDEF012345'; // Your 32-char API key
+const API_KEY = '12345678-1234-1234-1234-123456789abc'; // Your UUID API key
 
 const editor = Jodit.make('#editor', {
   aiAssistantPro: {
@@ -108,7 +108,7 @@ const editor = Jodit.make('#editor', {
   aiAssistantPro: {
     apiRequest: createAdapterRequester(
       'https://your-domain.com/ai-adapter',
-      'YOUR-API-KEY-32-CHARACTERS-HERE',
+      '12345678-1234-1234-1234-123456789abc',
       'openai'
     ),
 
@@ -117,12 +117,12 @@ const editor = Jodit.make('#editor', {
     panelWidth: 400,
 
     // Model settings
-    defaultModel: 'gpt-5.1',
+    defaultModel: 'gpt-5.2',
     defaultTemperature: 0.7,
     allowEditDialogSettings: true,
 
     dialogSettings: {
-      models: ['gpt-5.1', 'gpt-5.1-mini', 'gpt-5.1-nano'],
+      models: ['gpt-5.2', 'gpt-5.2-mini', 'gpt-5.2-nano'],
       temperature: {
         min: 0,
         max: 2,
@@ -252,7 +252,7 @@ function createAdapterRequester(adapterUrl, apiKey, provider) {
 const API_CONFIG = {
   development: {
     url: 'http://localhost:8082',
-    apiKey: 'DEV-API-KEY-1234567890ABCDEF'
+    apiKey: '12345678-1234-1234-1234-123456789abc'
   },
   production: {
     url: 'https://ai-adapter.yourdomain.com',
@@ -341,7 +341,7 @@ const editor = Jodit.make<HTMLDivElement>('#editor', {
   aiAssistantPro: {
     apiRequest: createAdapterRequester({
       url: 'http://localhost:8082',
-      apiKey: 'ABCDEF0123456789-ABCDEF012345',
+      apiKey: '12345678-1234-1234-1234-123456789abc',
       provider: 'openai'
     })
   }

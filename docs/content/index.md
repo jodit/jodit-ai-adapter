@@ -12,7 +12,7 @@ This service provides a secure, server-side proxy for AI providers (OpenAI, Deep
 ## Features
 
 - 🔒 **Secure API Key Management** - API keys stored server-side, not exposed to clients
-- 🔑 **Authentication** - Validates API keys (32 characters, A-F0-9-) and referer headers
+- 🔑 **Authentication** - Validates API keys (36 characters, UUID format) and referer headers
 - 🌐 **Multi-Provider Support** - OpenAI, DeepSeek, Anthropic, Google (extensible)
 - 📡 **Streaming Support** - Real-time streaming responses using Server-Sent Events (SSE)
 - 🛠️ **Tool Calling** - Full support for function/tool calling
@@ -101,7 +101,7 @@ docker run -p 8082:8082 --env-file .env jodit-ai-adapter
 ### Health Check
 
 ```http
-GET /health
+GET /ai/health
 ```
 
 Returns service status and available providers.
@@ -111,7 +111,7 @@ Returns service status and available providers.
 ```http
 POST /ai/request
 Content-Type: application/json
-Authorization: Bearer YOUR-API-KEY-32-CHARS
+Authorization: Bearer 12345678-1234-1234-1234-123456789abc
 ```
 
 **Request:**
@@ -120,7 +120,6 @@ Authorization: Bearer YOUR-API-KEY-32-CHARS
   "provider": "openai",
   "context": {
     "mode": "full",
-    "conversationId": "conv_123",
     "messages": [
       {
         "id": "msg_1",
@@ -143,6 +142,26 @@ data: {"type":"text-delta","delta":"Hello"}
 
 event: completed
 data: {"type":"completed","response":{"finished":true}}
+```
+
+### Image Generation
+
+```http
+POST /ai/image/generate
+Content-Type: application/json
+Authorization: Bearer 12345678-1234-1234-1234-123456789abc
+```
+
+**Request:**
+```json
+{
+  "provider": "openai",
+  "request": {
+    "prompt": "A white siamese cat with blue eyes",
+    "model": "dall-e-3",
+    "size": "1024x1024"
+  }
+}
 ```
 
 ## License

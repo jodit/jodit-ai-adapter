@@ -57,7 +57,7 @@ This document describes the architecture and design decisions of the Jodit AI Ad
 - Supports wildcards, specific domains, and RegExp patterns
 
 #### Auth Middleware (`src/middlewares/auth.ts`)
-- Validates API key format (32 chars, A-F0-9-)
+- Validates API key format (36 chars, UUID format: A-F0-9-)
 - Extracts API key from `Authorization` or `x-api-key` header
 - Validates referer if required
 - Calls custom authentication callback
@@ -84,7 +84,28 @@ Implements OpenAI integration:
 - Creates adapter instances based on provider type
 - Manages API key priority (user key > config key)
 
-### 3. Type System
+### 3. Routes (`src/routes/<name>/`)
+
+Each route is organized as a module with its own directory:
+- `handler.ts` - Request handler logic
+- `index.ts` - Router factory function
+- `schema.ts` - Zod validation schemas
+- `handler.test.ts` - Route-specific tests
+
+Available routes:
+- `ai-request/` - `POST /ai/request` - AI text generation (streaming SSE)
+- `ai-providers/` - `GET /ai/providers` - List configured providers
+- `image-generate/` - `POST /ai/image/generate` - Image generation
+- `health/` - `GET /ai/health` - Health check
+
+### 4. Rate Limiter (`src/rate-limiter/`)
+
+Built-in rate limiting with pluggable backends:
+- `memory-rate-limiter.ts` - In-memory rate limiting for single-instance deployments
+- `redis-rate-limiter.ts` - Redis-based rate limiting for distributed deployments
+- `rate-limiter-factory.ts` - Creates rate limiter based on configuration
+
+### 5. Type System
 
 #### Jodit AI Types (`src/types/jodit-ai.ts`)
 Defines interfaces matching Jodit AI Assistant Pro contract:
@@ -99,12 +120,12 @@ Defines interfaces matching Jodit AI Assistant Pro contract:
 - `ProviderConfig` - Provider-specific settings
 - `AuthCallback` - Authentication callback signature
 
-### 4. Application
+### 6. Application
 
 #### Express App (`src/app.ts`)
 Main application setup:
 - Middleware chain configuration
-- Route handlers (`/health`, `/ai/request`, `/ai/providers`)
+- Route handlers (`/ai/health`, `/ai/request`, `/ai/providers`, `/ai/image/generate`)
 - Request validation using Zod
 - Error handling
 - Streaming response handling (SSE)
@@ -120,14 +141,13 @@ Main application setup:
 ```
 POST /ai/request
 Headers:
-  Authorization: Bearer API-KEY-32-CHARS
+  Authorization: Bearer 12345678-1234-1234-1234-123456789abc
   Content-Type: application/json
 Body:
   {
     provider: "openai",
     context: {
       mode: "full",
-      conversationId: "conv_123",
       messages: [...],
       tools: [...],
       conversationOptions: { model: "gpt-5.2" }
@@ -218,7 +238,7 @@ Client                  Adapter Service          AI Provider
   │ Request + API Key          │                      │
   ├───────────────────────────►│                      │
   │                            │ Validate Key         │
-  │                            │ (32 chars)           │
+  │                            │ (36 chars, UUID)     │
   │                            │                      │
   │                            │ Custom Auth          │
   │                            │ (Optional)           │
@@ -412,12 +432,10 @@ Sensitive data via environment:
 
 ### Planned Features
 1. Additional providers (DeepSeek, Anthropic, Google)
-2. Rate limiting
-3. Usage tracking and analytics
-4. Caching layer for responses
-5. WebSocket support as alternative to SSE
-6. Admin dashboard
-7. Multi-tenancy support
+2. Caching layer for responses
+3. WebSocket support as alternative to SSE
+4. Admin dashboard
+5. Multi-tenancy support
 
 ### Performance Optimizations
 1. Response caching (Redis)

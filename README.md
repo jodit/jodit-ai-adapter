@@ -12,7 +12,7 @@ This service provides a secure, server-side proxy for AI providers (OpenAI, Deep
 ## Features
 
 - 🔒 **Secure API Key Management** - API keys stored server-side, not exposed to clients
-- 🔑 **Authentication** - Validates API keys (32 characters, A-F0-9-) and referer headers
+- 🔑 **Authentication** - Validates API keys (36 characters, UUID format) and referer headers
 - 🌐 **Multi-Provider Support** - OpenAI, DeepSeek, Anthropic, Google (extensible)
 - 📡 **Streaming Support** - Real-time streaming responses using Server-Sent Events (SSE)
 - 🛠️ **Tool Calling** - Full support for function/tool calling
@@ -103,7 +103,7 @@ npm start
 | `LOG_LEVEL` | Logging level | `debug` (dev), `info` (prod) |
 | `CORS_ORIGIN` | CORS allowed origins | `*` |
 | `OPENAI_API_KEY` | OpenAI API key | - |
-| `OPENAI_DEFAULT_MODEL` | Default OpenAI model | `gpt-5.1` |
+| `OPENAI_DEFAULT_MODEL` | Default OpenAI model | `gpt-5.2` |
 | `HTTP_PROXY` | HTTP/SOCKS5 proxy URL | - |
 | `RATE_LIMIT_ENABLED` | Enable rate limiting | `false` |
 | `RATE_LIMIT_TYPE` | Rate limiter type (`memory` or `redis`) | `memory` |
@@ -147,7 +147,7 @@ CONFIG_FILE=./config.json npm start
 ### Health Check
 
 ```http
-GET /health
+GET /ai/health
 ```
 
 Returns service status and available providers.
@@ -166,7 +166,7 @@ Returns service status and available providers.
 ```http
 POST /ai/request
 Content-Type: application/json
-Authorization: Bearer YOUR-API-KEY-32-CHARS
+Authorization: Bearer 12345678-1234-1234-1234-123456789abc
 ```
 
 **Request Body:**
@@ -175,7 +175,6 @@ Authorization: Bearer YOUR-API-KEY-32-CHARS
   "provider": "openai",
   "context": {
     "mode": "full",
-    "conversationId": "conv_123",
     "messages": [
       {
         "id": "msg_1",
@@ -209,11 +208,52 @@ event: completed
 data: {"type":"completed","response":{"responseId":"resp_123","content":"Hello!","finished":true}}
 ```
 
+### Image Generation
+
+```http
+POST /ai/image/generate
+Content-Type: application/json
+Authorization: Bearer 12345678-1234-1234-1234-123456789abc
+```
+
+**Request Body:**
+```json
+{
+  "provider": "openai",
+  "request": {
+    "prompt": "A white siamese cat with blue eyes",
+    "model": "dall-e-3",
+    "size": "1024x1024",
+    "quality": "standard"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "result": {
+    "images": [
+      {
+        "url": "https://example.com/generated-image.png",
+        "revisedPrompt": "A white siamese cat with striking blue eyes..."
+      }
+    ],
+    "created": 1700000000,
+    "metadata": {
+      "model": "dall-e-3",
+      "prompt": "A white siamese cat with blue eyes"
+    }
+  }
+}
+```
+
 ### Provider Info
 
 ```http
 GET /ai/providers
-Authorization: Bearer YOUR-API-KEY-32-CHARS
+Authorization: Bearer 12345678-1234-1234-1234-123456789abc
 ```
 
 Returns configured providers and their settings.
@@ -222,7 +262,7 @@ Returns configured providers and their settings.
 
 The service validates:
 
-1. **API Key Format**: Must be 32 characters containing A-F, 0-9, and hyphens
+1. **API Key Format**: Must be 36 characters in UUID format (A-F, 0-9, and hyphens)
 2. **API Key Header**: Sent via `Authorization: Bearer <key>` or `x-api-key: <key>`
 3. **Custom Validation**: Optional `checkAuthentication` callback
 
@@ -265,7 +305,6 @@ await start({
       userId: stats.userId,
       provider: stats.provider,
       model: stats.model,
-      conversationId: stats.conversationId,
       promptTokens: stats.promptTokens,
       completionTokens: stats.completionTokens,
       totalTokens: stats.totalTokens,
@@ -290,7 +329,6 @@ interface UsageStats {
   apiKey: string;              // API key used
   provider: string;            // AI provider (openai, deepseek, etc.)
   model: string;               // Model used (gpt-5.2, etc.)
-  conversationId: string;      // Conversation ID
   responseId: string;          // Response ID
   promptTokens?: number;       // Input tokens
   completionTokens?: number;   // Output tokens
@@ -450,7 +488,7 @@ const editor = Jodit.make('#editor', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer YOUR-API-KEY-32-CHARS'
+          'Authorization': 'Bearer 12345678-1234-1234-1234-123456789abc'
         },
         body: JSON.stringify({
           provider: 'openai',
@@ -484,9 +522,17 @@ jodit-ai-adapter/
 │   │   ├── base-adapter.ts
 │   │   ├── openai-adapter.ts
 │   │   └── adapter-factory.ts
+│   ├── routes/            # Route handlers
+│   │   ├── ai-request/    # POST /ai/request
+│   │   ├── ai-providers/  # GET /ai/providers
+│   │   ├── image-generate/ # POST /ai/image/generate
+│   │   └── health/        # GET /ai/health
 │   ├── middlewares/       # Express middlewares
 │   │   ├── auth.ts
 │   │   └── cors.ts
+│   ├── rate-limiter/      # Rate limiting
+│   │   ├── memory-rate-limiter.ts
+│   │   └── redis-rate-limiter.ts
 │   ├── types/            # TypeScript types
 │   │   ├── jodit-ai.ts
 │   │   ├── config.ts
@@ -499,7 +545,6 @@ jodit-ai-adapter/
 │   ├── index.ts          # Main entry point
 │   └── run.ts            # CLI runner
 ├── docs/                 # Documentation
-├── tests/                # Test files
 ├── Dockerfile
 ├── package.json
 └── tsconfig.json
@@ -574,7 +619,7 @@ describe('OpenAIAdapter', () => {
   it('should handle streaming response', async () => {
     // Mock OpenAI API
     nock('https://api.openai.com')
-      .post('/v1/chat/completions')
+      .post('/v1/responses')
       .reply(200, {
         // Mock response
       });
@@ -636,7 +681,7 @@ services:
 ### Common Issues
 
 **API Key Invalid Format**
-- Ensure your API key is exactly 32 characters
+- Ensure your API key is exactly 36 characters (UUID format)
 - Must contain only A-F, 0-9, and hyphens
 
 **CORS Errors**

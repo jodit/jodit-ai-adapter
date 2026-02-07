@@ -48,15 +48,14 @@ await start({
   onUsage: async (stats) => {
     await pool.query(
       `INSERT INTO ai_usage
-       (user_id, provider, model, conversation_id, response_id,
+       (user_id, provider, model, response_id,
         prompt_tokens, completion_tokens, total_tokens,
         duration, timestamp, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         stats.userId,
         stats.provider,
         stats.model,
-        stats.conversationId,
         stats.responseId,
         stats.promptTokens || 0,
         stats.completionTokens || 0,
@@ -94,7 +93,6 @@ await start({
       userId: stats.userId,
       provider: stats.provider,
       model: stats.model,
-      conversationId: stats.conversationId,
       responseId: stats.responseId,
       tokens: {
         prompt: stats.promptTokens,
@@ -272,8 +270,7 @@ await start({
         provider: stats.provider,
         model: stats.model,
         tokens: stats.totalTokens,
-        duration: stats.duration,
-        conversationId: stats.conversationId
+        duration: stats.duration
       },
       timestamp: new Date(stats.timestamp)
     });
@@ -321,7 +318,6 @@ await start({
       userId: stats.userId,
       provider: stats.provider,
       model: stats.model,
-      conversationId: stats.conversationId,
       tokens: {
         prompt: stats.promptTokens,
         completion: stats.completionTokens,
@@ -409,7 +405,6 @@ CREATE TABLE ai_usage (
   user_id VARCHAR(255) NOT NULL,
   provider VARCHAR(50) NOT NULL,
   model VARCHAR(100) NOT NULL,
-  conversation_id VARCHAR(255) NOT NULL,
   response_id VARCHAR(255) NOT NULL,
   prompt_tokens INTEGER,
   completion_tokens INTEGER,
@@ -420,8 +415,7 @@ CREATE TABLE ai_usage (
   metadata JSONB,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_user_timestamp (user_id, timestamp),
-  INDEX idx_provider_model (provider, model),
-  INDEX idx_conversation (conversation_id)
+  INDEX idx_provider_model (provider, model)
 );
 
 -- Query daily usage by user

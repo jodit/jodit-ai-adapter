@@ -41,9 +41,7 @@ export class OpenAIAdapter extends BaseAdapter {
 		// Create fetch with proxy support if configured
 		if (config.httpProxy) {
 			this.customFetch = createFetch(config.httpProxy);
-			logger.info('OpenAI adapter initialized with proxy', {
-				proxy: config.httpProxy
-			});
+			logger.info('OpenAI adapter initialized with proxy');
 		}
 
 		// Initialize OpenAI provider with Vercel AI SDK
