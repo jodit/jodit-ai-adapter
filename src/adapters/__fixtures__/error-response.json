@@ -1,0 +1,32 @@
+{
+	"request": {
+		"url": "https://api.openai.com/v1/responses",
+		"method": "POST",
+		"body": {
+			"model": "gpt-5.2",
+			"input": [
+				{
+					"role": "user",
+					"content": [
+						{
+							"type": "input_text",
+							"text": "Hello"
+						}
+					]
+				}
+			],
+			"max_output_tokens": 4000
+		}
+	},
+	"response": {
+		"status": 403,
+		"body": {
+			"error": {
+				"code": "unsupported_country_region_territory",
+				"message": "Country, region, or territory not supported",
+				"param": null,
+				"type": "request_forbidden"
+			}
+		}
+	}
+}

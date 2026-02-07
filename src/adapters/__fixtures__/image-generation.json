@@ -1,0 +1,24 @@
+{
+	"request": {
+		"url": "https://api.openai.com/v1/images/generations",
+		"method": "POST",
+		"body": {
+			"model": "dall-e-2",
+			"prompt": "A simple red circle on white background",
+			"n": 1,
+			"size": "256x256",
+			"response_format": "b64_json"
+		}
+	},
+	"response": {
+		"status": 200,
+		"body": {
+			"created": 1770449035,
+			"data": [
+				{
+					"b64_json": "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTED8xAAAAimVYSWZNTQAqAAAACAACknwAAgAAAC0AAAAmkoYAAQAAADYAAABU...TRUNCATED_FOR_FIXTURE"
+				}
+			]
+		}
+	}
+}

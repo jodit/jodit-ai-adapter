@@ -1,0 +1,134 @@
+{
+	"request": {
+		"url": "https://api.openai.com/v1/responses",
+		"method": "POST",
+		"body": {
+			"model": "gpt-4.1-nano",
+			"input": [
+				{
+					"role": "system",
+					"content": "You must use the get_weather tool to answer weather questions."
+				},
+				{
+					"role": "user",
+					"content": [
+						{
+							"type": "input_text",
+							"text": "What is the weather in London?"
+						}
+					]
+				}
+			],
+			"max_output_tokens": 4000,
+			"instructions": "You must use the get_weather tool to answer weather questions.",
+			"tools": [
+				{
+					"type": "function",
+					"name": "get_weather",
+					"description": "Get the current weather for a location",
+					"parameters": {
+						"type": "object",
+						"properties": {
+							"location": {
+								"type": "string",
+								"description": "The city name"
+							}
+						},
+						"required": [
+							"location"
+						]
+					}
+				}
+			],
+			"tool_choice": "auto"
+		}
+	},
+	"response": {
+		"status": 200,
+		"body": {
+			"id": "resp_006cbf242652b03d006986e880bbd48198afc563ce30af7669",
+			"object": "response",
+			"created_at": 1770449024,
+			"status": "completed",
+			"background": false,
+			"billing": {
+				"payer": "openai"
+			},
+			"completed_at": 1770449025,
+			"error": null,
+			"frequency_penalty": 0,
+			"incomplete_details": null,
+			"instructions": "You must use the get_weather tool to answer weather questions.",
+			"max_output_tokens": 4000,
+			"max_tool_calls": null,
+			"model": "gpt-4.1-nano-2025-04-14",
+			"output": [
+				{
+					"id": "fc_006cbf242652b03d006986e881ec7c8198afa18a56eac86ebe",
+					"type": "function_call",
+					"status": "completed",
+					"arguments": "{\"location\":\"London\"}",
+					"call_id": "call_tx63PoACHn3hNvdTMzXrtzxI",
+					"name": "get_weather"
+				}
+			],
+			"parallel_tool_calls": true,
+			"presence_penalty": 0,
+			"previous_response_id": null,
+			"prompt_cache_key": null,
+			"prompt_cache_retention": null,
+			"reasoning": {
+				"effort": null,
+				"summary": null
+			},
+			"safety_identifier": null,
+			"service_tier": "default",
+			"store": true,
+			"temperature": 1,
+			"text": {
+				"format": {
+					"type": "text"
+				},
+				"verbosity": "medium"
+			},
+			"tool_choice": "auto",
+			"tools": [
+				{
+					"type": "function",
+					"description": "Get the current weather for a location",
+					"name": "get_weather",
+					"parameters": {
+						"type": "object",
+						"properties": {
+							"location": {
+								"type": "string",
+								"description": "The city name"
+							}
+						},
+						"required": [
+							"location"
+						],
+						"additionalProperties": false
+					},
+					"strict": true
+				}
+			],
+			"top_logprobs": 0,
+			"top_p": 1,
+			"truncation": "disabled",
+			"usage": {
+				"input_tokens": 83,
+				"input_tokens_details": {
+					"cached_tokens": 0
+				},
+				"output_tokens": 31,
+				"output_tokens_details": {
+					"reasoning_tokens": 0
+				},
+				"total_tokens": 114
+			},
+			"user": null,
+			"metadata": {}
+		}
+	}
+}

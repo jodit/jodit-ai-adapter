@@ -1,235 +1,132 @@
 import nock from 'nock';
-import { jest } from '@jest/globals';
-import type { IAIRequestContext } from '../types';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { OpenAIAdapter } from './openai-adapter.js';
+import type { IAIRequestContext } from '../types/index.js';
+import type { JSONSchema7TypeName } from 'json-schema';
 
-// Define mock return types based on the AI SDK
-type MockGenerateTextResult = {
-	text: string;
-	usage?: {
-		prompt_tokens?: number;
-		completion_tokens?: number;
-		total_tokens?: number;
-	};
-	toolCalls?: Array<{
-		toolCallId: string;
-		toolName: string;
-		args: Record<string, unknown>;
-	}>;
-};
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-type MockStreamTextResult = {
-	textStream: AsyncGenerator<string>;
-	response: Promise<{
-		usage?: {
-			prompt_tokens?: number;
-			completion_tokens?: number;
-			total_tokens?: number;
-		};
-	}>;
-};
+function loadFixture(name: string) {
+	const filePath = path.join(__dirname, '__fixtures__', `${name}.json`);
+	return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+}
 
-// Create mock functions BEFORE mocking the module
-const mockStreamText = jest.fn<() => MockStreamTextResult>();
-const mockGenerateText = jest.fn<() => Promise<MockGenerateTextResult>>();
-const mockCreateOpenAI = jest.fn(() => jest.fn());
-
-// Mock the ai module with our mock functions
-jest.unstable_mockModule('ai', () => ({
-	streamText: mockStreamText,
-	generateText: mockGenerateText,
-	createOpenAI: mockCreateOpenAI
-}));
-
-// Now import after mocking
-const { OpenAIAdapter } = await import('./openai-adapter.js');
+const OPENAI_BASE = 'https://api.openai.com';
 
 describe('OpenAIAdapter', () => {
 	const mockApiKey = 'test-api-key-1234567890';
-	const mockContext: IAIRequestContext = {
-		mode: 'full',
-		conversationId: 'test-conv-123',
-		messages: [
-			{
-				id: 'msg-1',
-				role: 'user',
-				content: 'Hello, AI!',
-				timestamp: Date.now()
-			}
-		],
-		tools: [
-			{
-				name: 'get_time',
-				description: 'Get the current time',
-				parameters: [
-					{
-						name: 'timezone',
-						type: 'string',
-						description: 'The timezone to get the time for',
-						required: false
-					}
-				]
-			}
-		],
-		conversationOptions: {
-			model: 'gpt-5.2',
-			temperature: 0.7
-		},
-		instructions: 'You are a helpful assistant.'
-	};
 
 	beforeEach(() => {
-		// Clean up all nock interceptors before each test
 		nock.cleanAll();
-		// Reset mocks
-		jest.clearAllMocks();
 	});
 
 	afterAll(() => {
-		// Restore HTTP interceptors
+		nock.cleanAll();
 		nock.restore();
 	});
 
 	describe('constructor', () => {
 		it('should create adapter with valid config', () => {
-			const adapter = new OpenAIAdapter({
-				apiKey: mockApiKey
-			});
-
+			const adapter = new OpenAIAdapter({ apiKey: mockApiKey });
 			expect(adapter).toBeInstanceOf(OpenAIAdapter);
 		});
 
 		it('should throw error if API key is missing', () => {
-			expect(() => {
-				new OpenAIAdapter({
-					apiKey: ''
-				});
-			}).toThrow('API key is required');
+			expect(() => new OpenAIAdapter({ apiKey: '' })).toThrow(
+				'API key is required'
+			);
 		});
 	});
 
 	describe('handleRequest', () => {
-		it('should handle non-streaming response', async () => {
+		it('should handle non-streaming text generation', async () => {
+			const fixture = loadFixture('text-generation');
+
+			nock(OPENAI_BASE)
+				.post('/v1/responses')
+				.reply(fixture.response.status, fixture.response.body);
+
 			const adapter = new OpenAIAdapter({
-				apiKey: mockApiKey
+				apiKey: mockApiKey,
+				defaultModel: 'gpt-4.1-nano'
 			});
 
-			// Mock generateText response
-			mockGenerateText.mockResolvedValue({
-				text: 'Hello! How can I help you today?',
-				usage: {
-					prompt_tokens: 10,
-					completion_tokens: 20,
-					total_tokens: 30
-				}
-			});
-
-			const contextWithNoStream = {
-				...mockContext,
-				metadata: { stream: false }
+			const context: IAIRequestContext = {
+				mode: 'full',
+				messages: [
+					{
+						id: 'msg-1',
+						role: 'user',
+						content: 'Say "Hello, test!" and nothing else.',
+						timestamp: Date.now()
+					}
+				],
+				tools: [],
+				instructions: 'You are a test assistant. Reply very briefly.'
 			};
 
-			const abortController = new AbortController();
 			const result = await adapter.handleRequest(
-				contextWithNoStream,
-				abortController.signal
+				context,
+				new AbortController().signal
 			);
 
 			expect(result.mode).toBe('final');
 			if (result.mode === 'final') {
-				expect(result.response.responseId).toBeDefined();
-				expect(result.response.content).toBe(
-					'Hello! How can I help you today?'
+				expect(result.response.responseId).toBe(
+					fixture.response.body.id
 				);
+				expect(result.response.content).toBe('Hello, test!');
 				expect(result.response.finished).toBe(true);
-			}
-		});
-
-		it('should handle streaming response', async () => {
-			const adapter = new OpenAIAdapter({
-				apiKey: mockApiKey
-			});
-
-			// Mock streamText response
-			async function* mockTextStream(): AsyncGenerator<string> {
-				yield 'Hello';
-				yield '!';
-			}
-
-			mockStreamText.mockReturnValue({
-				textStream: mockTextStream(),
-				response: Promise.resolve({
-					usage: {
-						prompt_tokens: 10,
-						completion_tokens: 20,
-						total_tokens: 30
-					}
-				})
-			});
-
-			const abortController = new AbortController();
-			const result = await adapter.handleRequest(
-				mockContext,
-				abortController.signal
-			);
-
-			expect(result.mode).toBe('stream');
-			if (result.mode === 'stream') {
-				// Collect stream events
-				const events = [];
-				for await (const event of result.stream) {
-					events.push(event);
-				}
-
-				expect(events.length).toBeGreaterThan(0);
-				expect(events[0].type).toBe('created');
+				expect(result.response.metadata?.usage).toBeDefined();
 			}
 		});
 
 		it('should handle tool calls in response', async () => {
+			const fixture = loadFixture('text-with-tools');
+
+			nock(OPENAI_BASE)
+				.post('/v1/responses')
+				.reply(fixture.response.status, fixture.response.body);
+
 			const adapter = new OpenAIAdapter({
-				apiKey: mockApiKey
+				apiKey: mockApiKey,
+				defaultModel: 'gpt-4.1-nano'
 			});
 
-			// Mock generateText with tool calls
-			mockGenerateText.mockResolvedValue({
-				text: '',
-				toolCalls: [
+			const context: IAIRequestContext = {
+				mode: 'full',
+				messages: [
 					{
-						toolCallId: 'call_123',
-						toolName: 'get_weather',
-						args: { location: 'San Francisco' }
+						id: 'msg-1',
+						role: 'user',
+						content: 'What is the weather in London?',
+						timestamp: Date.now()
 					}
 				],
-				usage: {
-					prompt_tokens: 10,
-					completion_tokens: 20,
-					total_tokens: 30
-				}
-			});
-
-			const contextWithTools = {
-				...mockContext,
-				metadata: { stream: false },
 				tools: [
 					{
 						name: 'get_weather',
-						description: 'Get weather for a location',
+						description:
+							'Get the current weather for a location',
 						parameters: [
 							{
 								name: 'location',
-								type: 'string',
-								description: 'The location',
+								type: 'string' as JSONSchema7TypeName,
+								description: 'The city name',
 								required: true
 							}
 						]
 					}
-				]
+				],
+				instructions:
+					'You must use the get_weather tool to answer weather questions.'
 			};
 
-			const abortController = new AbortController();
 			const result = await adapter.handleRequest(
-				contextWithTools,
-				abortController.signal
+				context,
+				new AbortController().signal
 			);
 
 			expect(result.mode).toBe('final');
@@ -239,28 +136,44 @@ describe('OpenAIAdapter', () => {
 				expect(result.response.toolCalls?.[0].name).toBe(
 					'get_weather'
 				);
+				expect(result.response.toolCalls?.[0].arguments).toEqual({
+					location: 'London'
+				});
+				expect(result.response.content).toBe('');
 			}
 		});
 
-		it('should handle API errors', async () => {
-			const adapter = new OpenAIAdapter({
-				apiKey: mockApiKey
+		it('should handle API errors gracefully', async () => {
+			nock(OPENAI_BASE).post('/v1/responses').reply(401, {
+				error: {
+					message: 'Incorrect API key provided: sk-inval...sting.',
+					type: 'invalid_request_error',
+					param: null,
+					code: 'invalid_api_key'
+				}
 			});
 
-			// Mock generateText to reject with error
-			mockGenerateText.mockRejectedValue(
-				new Error('Invalid API key')
-			);
+			const adapter = new OpenAIAdapter({
+				apiKey: 'sk-invalid-key'
+			});
 
-			const contextWithNoStream = {
-				...mockContext,
-				metadata: { stream: false }
+			const context: IAIRequestContext = {
+				mode: 'full',
+				messages: [
+					{
+						id: 'msg-1',
+						role: 'user',
+						content: 'Hello',
+						timestamp: Date.now()
+					}
+				],
+				tools: []
 			};
 
-			const abortController = new AbortController();
+			// BaseAdapter.handleRequest catches errors and returns error response
 			const result = await adapter.handleRequest(
-				contextWithNoStream,
-				abortController.signal
+				context,
+				new AbortController().signal
 			);
 
 			expect(result.mode).toBe('final');
@@ -270,42 +183,240 @@ describe('OpenAIAdapter', () => {
 			}
 		});
 
-		it('should handle request cancellation', async () => {
+		it('should handle abort signal', async () => {
+			// Delay response so abort fires first
+			nock(OPENAI_BASE)
+				.post('/v1/responses')
+				.delay(5000)
+				.reply(200, {});
+
 			const adapter = new OpenAIAdapter({
-				apiKey: mockApiKey
+				apiKey: mockApiKey,
+				defaultModel: 'gpt-4.1-nano'
 			});
 
-			// Mock generateText to simulate abort
-			mockGenerateText.mockImplementation(() => {
-				return new Promise((_, reject) => {
-					setTimeout(() => {
-						const error = new Error('Aborted');
-						error.name = 'AbortError';
-						reject(error);
-					}, 200);
-				});
-			});
-
-			const contextWithNoStream = {
-				...mockContext,
-				metadata: { stream: false }
+			const context: IAIRequestContext = {
+				mode: 'full',
+				messages: [
+					{
+						id: 'msg-1',
+						role: 'user',
+						content: 'Hello',
+						timestamp: Date.now()
+					}
+				],
+				tools: []
 			};
 
 			const abortController = new AbortController();
-
-			// Abort immediately
-			setTimeout(() => abortController.abort(), 100);
+			setTimeout(() => abortController.abort(), 50);
 
 			const result = await adapter.handleRequest(
-				contextWithNoStream,
+				context,
 				abortController.signal
 			);
 
-			// Should return error response
 			expect(result.mode).toBe('final');
 			if (result.mode === 'final') {
 				expect(result.response.metadata?.error).toBe(true);
 			}
+		});
+
+		it('should use provided model from conversationOptions', async () => {
+			const fixture = loadFixture('text-generation');
+
+			const scope = nock(OPENAI_BASE)
+				.post('/v1/responses', (body: Record<string, unknown>) => {
+					return body.model === 'gpt-4.1-mini';
+				})
+				.reply(fixture.response.status, fixture.response.body);
+
+			const adapter = new OpenAIAdapter({
+				apiKey: mockApiKey,
+				defaultModel: 'gpt-4.1-nano'
+			});
+
+			const context: IAIRequestContext = {
+				mode: 'full',
+				messages: [
+					{
+						id: 'msg-1',
+						role: 'user',
+						content: 'Hello',
+						timestamp: Date.now()
+					}
+				],
+				tools: [],
+				conversationOptions: { model: 'gpt-4.1-mini' }
+			};
+
+			await adapter.handleRequest(
+				context,
+				new AbortController().signal
+			);
+
+			expect(scope.isDone()).toBe(true);
+		});
+
+		it('should pass selection contexts as user messages', async () => {
+			const fixture = loadFixture('text-generation');
+
+			const scope = nock(OPENAI_BASE)
+				.post('/v1/responses', (body: Record<string, unknown>) => {
+					const input = body.input as Array<Record<string, unknown>>;
+					// Should have system + user message + selection context message
+					return input.length >= 3;
+				})
+				.reply(fixture.response.status, fixture.response.body);
+
+			const adapter = new OpenAIAdapter({
+				apiKey: mockApiKey,
+				defaultModel: 'gpt-4.1-nano'
+			});
+
+			const context: IAIRequestContext = {
+				mode: 'full',
+				messages: [
+					{
+						id: 'msg-1',
+						role: 'user',
+						content: 'Fix this HTML',
+						timestamp: Date.now()
+					}
+				],
+				tools: [],
+				instructions: 'You are a helpful assistant.',
+				selectionContexts: [
+					{ html: '<p>Hello</p>' }
+				]
+			};
+
+			await adapter.handleRequest(
+				context,
+				new AbortController().signal
+			);
+
+			expect(scope.isDone()).toBe(true);
+		});
+	});
+
+	describe('handleImageGeneration', () => {
+		it('should generate images via Vercel AI SDK', async () => {
+			const fixture = loadFixture('image-generation');
+
+			nock(OPENAI_BASE)
+				.post('/v1/images/generations')
+				.reply(fixture.response.status, fixture.response.body);
+
+			const adapter = new OpenAIAdapter({
+				apiKey: mockApiKey,
+				defaultModel: 'gpt-4.1-nano'
+			});
+
+			const result = await adapter.handleImageGeneration(
+				{
+					prompt: 'A simple red circle on white background',
+					model: 'dall-e-2',
+					n: 1,
+					size: '256x256'
+				},
+				new AbortController().signal
+			);
+
+			expect(result.images).toHaveLength(1);
+			expect(result.images[0].b64_json).toBeDefined();
+			expect(result.created).toBeDefined();
+			expect(result.metadata?.model).toBe('dall-e-2');
+			expect(result.metadata?.prompt).toBe(
+				'A simple red circle on white background'
+			);
+		});
+
+		it('should pass provider options for quality and style', async () => {
+			const fixture = loadFixture('image-generation');
+
+			const scope = nock(OPENAI_BASE)
+				.post(
+					'/v1/images/generations',
+					(body: Record<string, unknown>) => {
+						return (
+							body.quality === 'hd' && body.style === 'vivid'
+						);
+					}
+				)
+				.reply(fixture.response.status, fixture.response.body);
+
+			const adapter = new OpenAIAdapter({
+				apiKey: mockApiKey
+			});
+
+			await adapter.handleImageGeneration(
+				{
+					prompt: 'A test image',
+					model: 'dall-e-3',
+					quality: 'hd',
+					style: 'vivid'
+				},
+				new AbortController().signal
+			);
+
+			expect(scope.isDone()).toBe(true);
+		});
+
+		it('should propagate usage data in metadata', async () => {
+			// Image response with usage data
+			nock(OPENAI_BASE)
+				.post('/v1/images/generations')
+				.reply(200, {
+					created: 1770449035,
+					data: [{ b64_json: 'abc123' }],
+					usage: {
+						input_tokens: 10,
+						output_tokens: 50,
+						total_tokens: 60
+					}
+				});
+
+			const adapter = new OpenAIAdapter({
+				apiKey: mockApiKey
+			});
+
+			const result = await adapter.handleImageGeneration(
+				{
+					prompt: 'A test',
+					model: 'dall-e-2',
+					size: '256x256'
+				},
+				new AbortController().signal
+			);
+
+			expect(result.metadata?.usage).toBeDefined();
+		});
+
+		it('should handle image generation API errors', async () => {
+			nock(OPENAI_BASE).post('/v1/images/generations').reply(400, {
+				error: {
+					message: 'Your request was rejected as a result of our safety system.',
+					type: 'invalid_request_error',
+					param: null,
+					code: 'content_policy_violation'
+				}
+			});
+
+			const adapter = new OpenAIAdapter({
+				apiKey: mockApiKey
+			});
+
+			await expect(
+				adapter.handleImageGeneration(
+					{
+						prompt: 'bad prompt',
+						model: 'dall-e-2',
+						size: '256x256'
+					},
+					new AbortController().signal
+				)
+			).rejects.toThrow();
 		});
 	});
 });
