@@ -1,79 +1,58 @@
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 import asyncHandler from 'express-async-handler';
 import Boom from '@hapi/boom';
-import type {
-	AuthenticatedRequest,
-	IImageGenerationRequest,
-	IImageGenerationAdapter
-} from '../../types';
-import { OpenAIImageAdapter } from '../../adapters/openai-image-adapter';
+import type { AppConfig, AuthenticatedRequest } from '../../types';
+import { AdapterFactory } from '../../adapters/adapter-factory';
+import { OpenAIAdapter } from '../../adapters/openai-adapter';
 import { logger } from '../../helpers/logger';
+import { ImageGenerationAPIRequestSchema } from './schema';
 
 /**
- * Image generation handler
+ * Image generation handler factory
  * Processes image generation requests through configured providers
  */
-export const imageGenerateHandler = asyncHandler(
-	async (req: Request, res: Response): Promise<void> => {
-		const authReq = req as AuthenticatedRequest;
-		const { provider, request: imageRequest } = req.body as {
-			provider: string;
-			request: IImageGenerationRequest;
-		};
+export const imageGenerateHandler = (config: AppConfig) =>
+	asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+		const parseResult = ImageGenerationAPIRequestSchema.safeParse(req.body);
 
-		// Validate request
-		if (!provider) {
-			throw Boom.badRequest('Provider is required');
+		if (!parseResult.success) {
+			throw Boom.badRequest('Invalid request body', {
+				errors: parseResult.error.issues
+			});
 		}
 
-		if (!imageRequest?.prompt) {
-			throw Boom.badRequest('Image generation request with prompt is required');
-		}
+		const { provider, request: imageRequest } = parseResult.data;
 
 		logger.info('Image generation request received', {
 			provider,
 			promptLength: imageRequest.prompt.length,
 			size: imageRequest.size,
 			n: imageRequest.n,
-			userId: authReq.userId
+			userId: req.userId
 		});
 
-		// Get provider configuration
-		const config = req.app.locals.config;
+		// Check if provider is configured
 		const providerConfig = config.providers[provider];
-
 		if (!providerConfig) {
 			throw Boom.badRequest(`Provider '${provider}' is not configured`);
 		}
 
-		// Create adapter based on provider
-		let adapter: IImageGenerationAdapter;
+		// Create adapter via factory
+		if (!AdapterFactory.isProviderSupported(provider)) {
+			throw Boom.badRequest(`Unsupported provider: ${provider}`);
+		}
 
-		try {
-			switch (providerConfig.type) {
-				case 'openai':
-					adapter = new OpenAIImageAdapter({
-						apiKey: providerConfig.apiKey || '',
-						apiEndpoint: providerConfig.apiEndpoint,
-						defaultModel: providerConfig.defaultModel || 'dall-e-3',
-						httpProxy: providerConfig.httpProxy
-					});
-					break;
+		const adapter = AdapterFactory.createAdapter(provider, providerConfig);
 
-				default:
-					throw Boom.badRequest(
-						`Image generation not supported for provider type: ${providerConfig.type}`
-					);
-			}
-		} catch (error) {
-			logger.error('Failed to create image generation adapter:', error);
-			throw Boom.badImplementation('Failed to initialize image generation adapter');
+		if (!(adapter instanceof OpenAIAdapter)) {
+			throw Boom.badRequest(
+				`Image generation not supported for provider type: ${providerConfig.type}`
+			);
 		}
 
 		// Create abort controller for request cancellation
 		const abortController = new AbortController();
 
-		// Handle connection close
 		req.on('close', () => {
 			if (!res.writableEnded) {
 				logger.warn('Client disconnected, aborting image generation');
@@ -81,11 +60,13 @@ export const imageGenerateHandler = asyncHandler(
 			}
 		});
 
-		try {
-			const startTime = Date.now();
+		const startTime = Date.now();
 
-			// Generate image
-			const result = await adapter.generateImage(imageRequest, abortController.signal);
+		try {
+			const result = await adapter.handleImageGeneration(
+				imageRequest,
+				abortController.signal
+			);
 
 			const duration = Date.now() - startTime;
 
@@ -93,19 +74,27 @@ export const imageGenerateHandler = asyncHandler(
 				provider,
 				imageCount: result.images.length,
 				duration,
-				userId: authReq.userId
+				userId: req.userId
 			});
 
 			// Track usage if callback is configured
-			if (config.onUsage && authReq.apiKey) {
+			if (config.onUsage && req.apiKey) {
+				const usage = result.metadata?.usage as {
+					inputTokens?: number;
+					outputTokens?: number;
+					totalTokens?: number;
+				} | undefined;
+
 				try {
 					await config.onUsage({
-						userId: authReq.userId || 'anonymous',
-						apiKey: authReq.apiKey,
+						userId: req.userId || 'anonymous',
+						apiKey: req.apiKey,
 						provider,
 						model: result.metadata?.model || 'unknown',
-						conversationId: 'image-generation',
 						responseId: `img-${Date.now()}`,
+						promptTokens: usage?.inputTokens,
+						completionTokens: usage?.outputTokens,
+						totalTokens: usage?.totalTokens,
 						timestamp: Date.now(),
 						duration,
 						metadata: {
@@ -119,7 +108,6 @@ export const imageGenerateHandler = asyncHandler(
 				}
 			}
 
-			// Send response
 			res.json({
 				success: true,
 				result
@@ -135,5 +123,4 @@ export const imageGenerateHandler = asyncHandler(
 				error instanceof Error ? error.message : 'Image generation failed'
 			);
 		}
-	}
-);
+	});

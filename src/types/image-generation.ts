@@ -83,18 +83,3 @@ export interface IImageGenerationResponse {
 	};
 }
 
-/**
- * Image generation adapter interface
- */
-export interface IImageGenerationAdapter {
-	/**
-	 * Generate images from text prompt
-	 * @param request - Image generation request
-	 * @param signal - Abort signal for cancellation
-	 * @returns Generated images
-	 */
-	generateImage(
-		request: IImageGenerationRequest,
-		signal?: AbortSignal
-	): Promise<IImageGenerationResponse>;
-}

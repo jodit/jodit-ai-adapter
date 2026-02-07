@@ -12,7 +12,7 @@ import { createRateLimitMiddleware } from './middlewares/rate-limit';
 import { RateLimiterFactory } from './rate-limiter';
 import { logger } from './helpers/logger';
 import healthRouter from './routes/health';
-import imageGenerateRouter from './routes/image-generate';
+import { createImageGenerateRouter } from './routes/image-generate';
 import { createAiRequestRouter } from './routes/ai-request';
 import { createAiProvidersRouter } from './routes/ai-providers';
 
@@ -92,7 +92,7 @@ export function createApp(
 	}
 
 	// Routes
-	router.use('/image', imageGenerateRouter);
+	router.use('/image', createImageGenerateRouter(appConfig));
 	router.use('/request', createAiRequestRouter(appConfig));
 	router.use('/providers', createAiProvidersRouter(appConfig));
 

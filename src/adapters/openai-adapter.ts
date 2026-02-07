@@ -3,6 +3,7 @@ import {
 	// streamText,
 	tool,
 	generateText,
+	generateImage,
 	ModelMessage,
 	ToolSet,
 	Schema,
@@ -17,7 +18,9 @@ import type {
 	StreamTextParams,
 	IToolParameter,
 	IAIResponse,
-	IToolCall
+	IToolCall,
+	IImageGenerationRequest,
+	IImageGenerationResponse
 } from '../types';
 import { BaseAdapter, type BaseAdapterConfig } from './base-adapter';
 import { logger } from '../helpers/logger';
@@ -257,6 +260,58 @@ export class OpenAIAdapter extends BaseAdapter {
 		return {
 			mode: 'final',
 			response
+		};
+	}
+
+	/**
+	 * Generate images using Vercel AI SDK
+	 */
+	async handleImageGeneration(
+		request: IImageGenerationRequest,
+		signal?: AbortSignal
+	): Promise<IImageGenerationResponse> {
+		const model = request.model || this.config.defaultModel || 'dall-e-3';
+
+		logger.debug('Generating image with OpenAI via Vercel AI SDK', {
+			model,
+			prompt: request.prompt.substring(0, 100),
+			size: request.size,
+			n: request.n
+		});
+
+		const result = await generateImage({
+			model: this.provider.image(model),
+			prompt: request.prompt,
+			n: request.n || 1,
+			size: request.size || '1024x1024',
+			providerOptions: {
+				openai: {
+					...(request.quality ? { quality: request.quality } : {}),
+					...(request.style ? { style: request.style } : {}),
+					...(request.responseFormat
+						? { response_format: request.responseFormat }
+						: {}),
+					...(request.user ? { user: request.user } : {})
+				}
+			},
+			abortSignal: signal
+		});
+
+		logger.debug('Image generation completed', {
+			imageCount: result.images.length,
+			usage: result.usage
+		});
+
+		return {
+			images: result.images.map((img) => ({
+				b64_json: img.base64,
+			})),
+			created: Date.now(),
+			metadata: {
+				model,
+				prompt: request.prompt,
+				usage: result.usage
+			}
 		};
 	}
 
