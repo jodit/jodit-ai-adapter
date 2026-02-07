@@ -27,6 +27,7 @@ coverage/
 
 # IDE
 .idea/
+.env
 .vscode/
 .claude
 *.swp
