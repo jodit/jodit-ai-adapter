@@ -56,9 +56,22 @@ describe('OpenAIAdapter', () => {
 				timestamp: Date.now()
 			}
 		],
-		tools: [],
+		tools: [
+			{
+				name: 'get_time',
+				description: 'Get the current time',
+				parameters: [
+					{
+						name: 'timezone',
+						type: 'string',
+						description: 'The timezone to get the time for',
+						required: false
+					}
+				]
+			}
+		],
 		conversationOptions: {
-			model: 'gpt-4o',
+			model: 'gpt-5.2',
 			temperature: 0.7
 		},
 		instructions: 'You are a helpful assistant.'

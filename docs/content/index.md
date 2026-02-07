@@ -41,7 +41,7 @@ await start({
     openai: {
       type: 'openai',
       apiKey: process.env.OPENAI_API_KEY,
-      defaultModel: 'gpt-4o'
+      defaultModel: 'gpt-5.2'
     }
   }
 });
@@ -70,7 +70,7 @@ docker run -p 8082:8082 --env-file .env jodit-ai-adapter
 | `PORT` | Server port | `8082` |
 | `NODE_ENV` | Environment mode | `development` |
 | `OPENAI_API_KEY` | OpenAI API key | - |
-| `OPENAI_DEFAULT_MODEL` | Default OpenAI model | `gpt-4o` |
+| `OPENAI_DEFAULT_MODEL` | Default OpenAI model | `gpt-5.2` |
 | `RATE_LIMIT_ENABLED` | Enable rate limiting | `false` |
 | `RATE_LIMIT_TYPE` | Rate limiter type (`memory` or `redis`) | `memory` |
 | `REDIS_URL` | Redis connection URL | - |
@@ -84,7 +84,7 @@ docker run -p 8082:8082 --env-file .env jodit-ai-adapter
     "openai": {
       "type": "openai",
       "apiKey": "sk-...",
-      "defaultModel": "gpt-4o"
+      "defaultModel": "gpt-5.2"
     }
   },
   "rateLimit": {

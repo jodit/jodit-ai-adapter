@@ -116,11 +116,11 @@ import { start } from 'jodit-ai-adapter';
 
 // Define pricing per model (per 1M tokens)
 const PRICING = {
-  'gpt-4o': {
+  'gpt-5.2': {
     input: 2.50,  // $2.50 per 1M input tokens
     output: 10.00  // $10.00 per 1M output tokens
   },
-  'gpt-4o-mini': {
+  'gpt-5.2-mini': {
     input: 0.15,
     output: 0.60
   }

@@ -43,7 +43,7 @@ components:
         defaultModel:
           type: string
           description: Default model for this provider
-          example: gpt-4o
+          example: gpt-5.2
         configured:
           type: boolean
           description: Whether provider is configured with API key
@@ -426,7 +426,7 @@ components:
         model:
           type: string
           description: AI model to use
-          example: gpt-4o
+          example: gpt-5.2
         temperature:
           type: number
           description: Temperature parameter (0-2)

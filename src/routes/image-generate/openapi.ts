@@ -1,8 +1,8 @@
 import {
 	ImageGenerationAPIRequestSchema,
-	ImageGenerationSuccessResponseSchema,
-	ErrorResponseSchema
-} from '../../schemas';
+	ImageGenerationSuccessResponseSchema
+} from './schema';
+import { ErrorResponseSchema } from '../error.schema';
 
 export default {
 	method: 'post' as const,

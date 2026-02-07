@@ -3,6 +3,9 @@
  * These match the contract that Jodit expects
  */
 
+import { JSONValue } from 'ai';
+import type { JSONSchema7TypeName } from 'json-schema';
+
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
 
 export type AIAssistantAPIMode = 'full' | 'incremental';
@@ -38,11 +41,13 @@ export interface IToolCall {
 /**
  * Tool result message
  */
-export interface IToolResult {
+export type IToolResult = {
 	readonly toolCallId: string;
-	readonly result?: unknown;
-	readonly error?: string;
-}
+	readonly result: JSONValue;
+} | {
+	readonly toolCallId: string;
+	readonly error: string;
+};
 
 /**
  * AI message in conversation
@@ -78,8 +83,9 @@ export interface IAIArtifact {
  */
 export interface IToolParameter {
 	readonly name: string;
-	readonly type: string;
+	readonly type: JSONSchema7TypeName;
 	readonly description: string;
+	readonly parameters?: readonly IToolParameter[];
 	readonly required: boolean;
 	readonly enum?: readonly string[];
 	readonly default?: unknown;
@@ -107,7 +113,6 @@ export interface IConversationOptions {
  */
 export interface IAIRequestContext {
 	readonly mode: AIAssistantAPIMode;
-	readonly conversationId: string;
 	readonly messages?: readonly IAIMessage[];
 	readonly parentMessageId?: string;
 	readonly tools: readonly IToolDefinition[];

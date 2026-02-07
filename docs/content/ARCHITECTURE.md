@@ -130,7 +130,7 @@ Body:
       conversationId: "conv_123",
       messages: [...],
       tools: [...],
-      conversationOptions: { model: "gpt-4o" }
+      conversationOptions: { model: "gpt-5.2" }
     }
   }
 ```

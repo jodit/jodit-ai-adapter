@@ -4,9 +4,9 @@ import type { AppConfig, AuthenticatedRequest } from '../types';
 import { logger } from '../helpers/logger';
 
 /**
- * Default API key pattern: 32 characters, A-F, 0-9, and hyphens
+ * Default API key pattern: 36 characters, A-F, 0-9, and hyphens
  */
-const DEFAULT_API_KEY_PATTERN = /^[A-F0-9-]{32}$/i;
+const DEFAULT_API_KEY_PATTERN = /^[A-F0-9-]{36}$/i;
 
 /**
  * Extract API key from request
@@ -32,6 +32,11 @@ function extractApiKey(req: Request): string | undefined {
 	const apiKeyQuery = req.query.apikey;
 	if (typeof apiKeyQuery === 'string') {
 		return apiKeyQuery;
+	}
+
+	const keyQuery = req.query.key;
+	if (typeof keyQuery === 'string') {
+		return keyQuery;
 	}
 
 	return undefined;
@@ -103,6 +108,7 @@ export function authMiddleware(config: AppConfig) {
 			// Validate API key format
 			const apiKeyPattern =
 				config.apiKeyPattern || DEFAULT_API_KEY_PATTERN;
+
 			if (!validateApiKeyFormat(apiKey, apiKeyPattern)) {
 				logger.warn('Invalid API key format', {
 					ip: req.ip,

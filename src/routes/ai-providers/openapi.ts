@@ -1,4 +1,5 @@
-import { ProvidersResponseSchema, ErrorResponseSchema } from '../../schemas';
+import { ProvidersResponseSchema } from './schema';
+import { ErrorResponseSchema } from '../error.schema';
 
 export default {
 	method: 'get' as const,

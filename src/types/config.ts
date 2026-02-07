@@ -28,9 +28,6 @@ export interface UsageStats {
 	/** Model used */
 	model: string;
 
-	/** Conversation ID */
-	conversationId: string;
-
 	/** Response ID */
 	responseId: string;
 

@@ -6,13 +6,11 @@
 
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import dotenv from 'dotenv';
 import { start } from './index';
 import { logger } from './helpers/logger';
 import type { AppConfig } from './types';
 
 // Load environment variables
-dotenv.config();
 
 /**
  * Load configuration from file or environment

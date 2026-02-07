@@ -2,8 +2,7 @@ import type {
 	IAIRequestContext,
 	IAIAssistantResult,
 	IAIResponse,
-	AIStreamEvent,
-	IToolCall
+	AIStreamEvent
 } from '../types';
 import { logger } from '../helpers/logger';
 
@@ -42,7 +41,6 @@ export abstract class BaseAdapter {
 	): Promise<IAIAssistantResult> {
 		try {
 			logger.debug('Handling AI request', {
-				conversationId: context.conversationId,
 				mode: context.mode,
 				messageCount: context.messages?.length || 0,
 				toolCount: context.tools.length
@@ -88,24 +86,6 @@ export abstract class BaseAdapter {
 				}
 			}
 		};
-	}
-
-	/**
-	 * Convert tool calls to the format expected by Jodit
-	 */
-	protected convertToolCalls(
-		toolCalls: Array<{
-			id: string;
-			name: string;
-			arguments: Record<string, unknown>;
-		}>
-	): IToolCall[] {
-		return toolCalls.map((tc) => ({
-			id: tc.id,
-			name: tc.name,
-			arguments: tc.arguments,
-			status: 'pending' as const
-		}));
 	}
 
 	/**

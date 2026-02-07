@@ -1,4 +1,7 @@
+import dotenv from 'dotenv';
 import type { AppConfig } from '../types';
+
+dotenv.config();
 
 /**
  * Default application configuration
@@ -10,13 +13,13 @@ export const defaultConfig: AppConfig = {
 	maxRetries: 3,
 	corsOrigin: process.env.CORS_ORIGIN || '*',
 	requireReferer: false,
-	apiKeyPattern: /^[A-F0-9-]{32}$/i, // 32 characters: A-F, 0-9, hyphens
+	apiKeyPattern: /^[A-F0-9-]{36}$/i, // 36 characters: A-F, 0-9, hyphens
 	providers: {
 		openai: {
 			type: 'openai',
 			apiKey: process.env.OPENAI_API_KEY,
 			apiEndpoint: process.env.OPENAI_API_ENDPOINT,
-			defaultModel: process.env.OPENAI_DEFAULT_MODEL || 'gpt-4o',
+			defaultModel: process.env.OPENAI_DEFAULT_MODEL || 'gpt-5.2',
 			httpProxy: process.env.HTTP_PROXY
 		}
 		// Add more providers as needed:
@@ -51,8 +54,7 @@ export const defaultConfig: AppConfig = {
 					redisDb: process.env.REDIS_DB
 						? parseInt(process.env.REDIS_DB, 10)
 						: undefined,
-					keyPrefix:
-						process.env.RATE_LIMIT_KEY_PREFIX || 'rl:'
+					keyPrefix: process.env.RATE_LIMIT_KEY_PREFIX || 'rl:'
 				}
 			: undefined
 };

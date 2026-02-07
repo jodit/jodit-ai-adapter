@@ -1,8 +1,5 @@
-import {
-	AIRequestSchema,
-	AIRequestSuccessResponseSchema,
-	ErrorResponseSchema
-} from '../../schemas';
+import { AIRequestSchema, AIRequestSuccessResponseSchema } from './schema';
+import { ErrorResponseSchema } from '../error.schema';
 
 export default {
 	method: 'post' as const,

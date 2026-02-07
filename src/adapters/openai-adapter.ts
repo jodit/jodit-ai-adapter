@@ -1,21 +1,29 @@
 import { createOpenAI } from '@ai-sdk/openai';
-import { streamText, generateText } from 'ai';
+import {
+	// streamText,
+	tool,
+	generateText,
+	ModelMessage,
+	ToolSet,
+	Schema,
+	jsonSchema,
+	JSONSchema7
+} from 'ai';
 import type {
 	IAIRequestContext,
 	IAIAssistantResult,
 	IAIMessage,
 	IToolDefinition,
-	AIStreamEvent,
 	StreamTextParams,
-	AISDKToolDefinition,
-	AISDKToolParameters,
-	AISDKPropertyDefinition,
-	AISDKStreamTextResult,
-	AISDKGenerateTextResult
+	IToolParameter,
+	IAIResponse,
+	IToolCall
 } from '../types';
 import { BaseAdapter, type BaseAdapterConfig } from './base-adapter';
 import { logger } from '../helpers/logger';
 import { createFetch } from '../helpers/proxy';
+
+type GenerateTextResult = Awaited<ReturnType<typeof generateText>>;
 
 /**
  * OpenAI adapter using Vercel AI SDK
@@ -51,7 +59,7 @@ export class OpenAIAdapter extends BaseAdapter {
 		const model =
 			context.conversationOptions?.model ||
 			this.config.defaultModel ||
-			'gpt-4o';
+			'gpt-5.2';
 
 		// Build messages for the AI
 		const messages = this.buildMessages(context);
@@ -60,17 +68,19 @@ export class OpenAIAdapter extends BaseAdapter {
 		const tools = this.buildTools(context.tools);
 
 		// Common parameters
-		const commonParams = {
-			model: this.provider(model),
+		const commonParams: StreamTextParams = {
+			model: {
+				modelId: model
+			},
 			messages,
 			temperature: context.conversationOptions?.temperature,
-			maxTokens: 4000,
+			maxOutputTokens: 4000,
 			abortSignal: signal,
 			...(Object.keys(tools).length > 0 ? { tools } : {})
 		};
 
 		// For streaming mode
-		if (context.metadata?.stream !== false) {
+		if (context.metadata?.stream === true) {
 			return await this.handleStreaming(commonParams, context);
 		}
 
@@ -81,22 +91,18 @@ export class OpenAIAdapter extends BaseAdapter {
 	/**
 	 * Extract tool calls from AI SDK response
 	 */
-	private extractToolCalls(response: Record<string, unknown>): Array<{
-		toolCallId: string;
-		toolName: string;
-		args: Record<string, unknown>;
-	}> {
+	private extractToolCalls(response: GenerateTextResult): Array<IToolCall> {
 		const toolCalls = response.toolCalls;
 		if (!Array.isArray(toolCalls)) {
 			return [];
 		}
 
-		return toolCalls.map((tc: unknown) => {
-			const call = tc as Record<string, unknown>;
+		return toolCalls.map((tc): IToolCall => {
 			return {
-				toolCallId: String(call.toolCallId || ''),
-				toolName: String(call.toolName || ''),
-				args: (call.args as Record<string, unknown>) || {}
+				id: tc.toolCallId,
+				name: tc.toolName,
+				arguments: tc.input,
+				status: 'pending'
 			};
 		});
 	}
@@ -105,99 +111,101 @@ export class OpenAIAdapter extends BaseAdapter {
 	 * Handle streaming response
 	 */
 	private async handleStreaming(
-		params: StreamTextParams,
+		_: StreamTextParams,
 		_context: IAIRequestContext
 	): Promise<IAIAssistantResult> {
 		// streamText returns a result compatible with AISDKStreamTextResult
-		const result: AISDKStreamTextResult = streamText(
-			params as Parameters<typeof streamText>[0]
-		) as AISDKStreamTextResult;
+		// const result: AISDKStreamTextResult = streamText(
+		// params as Parameters<typeof streamText>[0]
+		// ) as AISDKStreamTextResult;
 
-		async function* generateStream(
-			adapter: OpenAIAdapter
-		): AsyncGenerator<AIStreamEvent> {
-			const responseId = adapter.generateResponseId('openai');
-			let fullText = '';
-			let isFirst = true;
+		throw new Error('Streaming is not implemented yet for OpenAI adapter.');
 
-			try {
-				// Yield created event
-				yield {
-					type: 'created',
-					response: {
-						responseId,
-						content: '',
-						finished: false
-					}
-				};
+		// async function* generateStream(
+		// 	adapter: OpenAIAdapter
+		// ): AsyncGenerator<AIStreamEvent> {
+		// 	const responseId = adapter.generateResponseId('openai');
+		// 	let fullText = '';
+		// 	let isFirst = true;
 
-				// Stream text deltas
-				for await (const chunk of result.textStream) {
-					fullText += chunk;
-					yield {
-						type: 'text-delta',
-						delta: chunk
-					};
+		// 	try {
+		// 		// Yield created event
+		// 		yield {
+		// 			type: 'created',
+		// 			response: {
+		// 				responseId,
+		// 				content: '',
+		// 				finished: false
+		// 			}
+		// 		};
 
-					if (isFirst) {
-						isFirst = false;
-						logger.debug('First chunk received', { responseId });
-					}
-				}
+		// 		// Stream text deltas
+		// 		for await (const chunk of result.textStream) {
+		// 			fullText += chunk;
+		// 			yield {
+		// 				type: 'text-delta',
+		// 				delta: chunk
+		// 			};
 
-				// Wait for completion to get tool calls
-				const finalResult = await result.response;
+		// 			if (isFirst) {
+		// 				isFirst = false;
+		// 				logger.debug('First chunk received', { responseId });
+		// 			}
+		// 		}
 
-				// Build tool calls if any
-				const extractedToolCalls =
-					adapter.extractToolCalls(finalResult);
-				const toolCalls =
-					extractedToolCalls.length > 0
-						? adapter.convertToolCalls(
-								extractedToolCalls.map((tc) => ({
-									id: tc.toolCallId,
-									name: tc.toolName,
-									arguments: tc.args
-								}))
-							)
-						: undefined;
+		// 		// Wait for completion to get tool calls
+		// 		const finalResult = await result.response;
 
-				// Yield completed event
-				yield {
-					type: 'completed',
-					response: {
-						responseId,
-						content: fullText,
-						toolCalls,
-						finished: true,
-						metadata: {
-							model: params.model.modelId,
-							usage: finalResult.usage
-						}
-					}
-				};
+		// 		// Build tool calls if any
+		// 		const extractedToolCalls =
+		// 			adapter.extractToolCalls(finalResult);
+		// 		const toolCalls =
+		// 			extractedToolCalls.length > 0
+		// 				? adapter.convertToolCalls(
+		// 						extractedToolCalls.map((tc) => ({
+		// 							id: tc.toolCallId,
+		// 							name: tc.toolName,
+		// 							arguments: tc.args
+		// 						}))
+		// 					)
+		// 				: undefined;
 
-				logger.debug('Stream completed', {
-					responseId,
-					textLength: fullText.length,
-					toolCallsCount: toolCalls?.length || 0
-				});
-			} catch (error) {
-				logger.error('Streaming error:', error);
-				yield {
-					type: 'error',
-					error:
-						error instanceof Error
-							? error
-							: new Error(String(error))
-				};
-			}
-		}
+		// 		// Yield completed event
+		// 		yield {
+		// 			type: 'completed',
+		// 			response: {
+		// 				responseId,
+		// 				content: fullText,
+		// 				toolCalls,
+		// 				finished: true,
+		// 				metadata: {
+		// 					model: params.model.modelId,
+		// 					usage: finalResult.usage
+		// 				}
+		// 			}
+		// 		};
 
-		return {
-			mode: 'stream',
-			stream: generateStream(this)
-		};
+		// 		logger.debug('Stream completed', {
+		// 			responseId,
+		// 			textLength: fullText.length,
+		// 			toolCallsCount: toolCalls?.length || 0
+		// 		});
+		// 	} catch (error) {
+		// 		logger.error('Streaming error:', error);
+		// 		yield {
+		// 			type: 'error',
+		// 			error:
+		// 				error instanceof Error
+		// 					? error
+		// 					: new Error(String(error))
+		// 		};
+		// 	}
+		// }
+
+		// return {
+		// 	mode: 'stream',
+		// 	stream: generateStream(this)
+		// };
 	}
 
 	/**
@@ -205,32 +213,32 @@ export class OpenAIAdapter extends BaseAdapter {
 	 */
 	private async handleNonStreaming(
 		params: StreamTextParams,
-		_context: IAIRequestContext
+		context: IAIRequestContext
 	): Promise<IAIAssistantResult> {
-		// generateText returns a result compatible with AISDKGenerateTextResult
-		const result: AISDKGenerateTextResult = (await generateText(
-			params as Parameters<typeof generateText>[0]
-		)) as unknown as AISDKGenerateTextResult;
+		const result = await generateText({
+			model: this.provider(params.model.modelId),
+			messages: params.messages,
+			temperature: params.temperature,
+			abortSignal: params.abortSignal,
+			maxOutputTokens: params.maxOutputTokens,
+			tools: params.tools,
+			providerOptions: {
+				openai: {
+					instructions: context.instructions,
+					previousResponseId: context.parentMessageId
+				}
+			}
+		});
 
-		const responseId = this.generateResponseId('openai');
+		const responseId = result.response.id;
 
 		// Build tool calls if any
 		const extractedToolCalls = this.extractToolCalls(result);
-		const toolCalls =
-			extractedToolCalls.length > 0
-				? this.convertToolCalls(
-						extractedToolCalls.map((tc) => ({
-							id: tc.toolCallId,
-							name: tc.toolName,
-							arguments: tc.args
-						}))
-					)
-				: undefined;
 
-		const response = {
+		const response: IAIResponse = {
 			responseId,
 			content: result.text,
-			toolCalls,
+			toolCalls: extractedToolCalls,
 			finished: true,
 			metadata: {
 				model: params.model.modelId,
@@ -243,7 +251,7 @@ export class OpenAIAdapter extends BaseAdapter {
 		logger.debug('Non-streaming response generated', {
 			responseId,
 			textLength: result.text.length,
-			toolCallsCount: toolCalls?.length || 0
+			toolCallsCount: extractedToolCalls?.length || 0
 		});
 
 		return {
@@ -254,10 +262,10 @@ export class OpenAIAdapter extends BaseAdapter {
 
 	/**
 	 * Build messages array for AI SDK
-	 * Returns CoreMessage[] compatible with Vercel AI SDK
+	 * Returns ModelMessage[] compatible with Vercel AI SDK
 	 */
-	private buildMessages(context: IAIRequestContext): unknown[] {
-		const messages: unknown[] = [];
+	private buildMessages(context: IAIRequestContext): ModelMessage[] {
+		const messages: ModelMessage[] = [];
 
 		// Add system instructions if provided
 		if (context.instructions) {
@@ -291,43 +299,54 @@ export class OpenAIAdapter extends BaseAdapter {
 
 	/**
 	 * Convert Jodit message to AI SDK format
-	 * Returns CoreMessage[] compatible with Vercel AI SDK
+	 * Returns ModelMessage[] compatible with Vercel AI SDK
 	 */
-	private convertMessage(message: IAIMessage): unknown[] {
-		const result: unknown[] = [];
+	private convertMessage(message: IAIMessage): ModelMessage[] {
+		const result: ModelMessage[] = [];
 
 		// Handle tool result messages
 		if (message.role === 'tool' && message.toolResults) {
 			for (const toolResult of message.toolResults) {
 				result.push({
 					role: 'tool',
-					toolCallId: toolResult.toolCallId,
-					content: toolResult.error
-						? `Error: ${toolResult.error}`
-						: JSON.stringify(toolResult.result)
+					content: [
+						{
+							type: 'tool-result',
+							toolCallId: toolResult.toolCallId,
+							toolName: '', // Tool name is not provided in toolResults, can be enhanced if needed,
+							output:
+								'error' in toolResult
+									? {
+											type: 'text',
+											value: `Error: ${toolResult.error}`
+										}
+									: { type: 'json', value: toolResult.result }
+						}
+					]
 				});
 			}
+
 			return result;
 		}
 
 		// Handle regular messages
 		if (message.content && message.role !== 'tool') {
-			const aiMessage: Record<string, unknown> = {
+			const aiMessage: ModelMessage = {
 				role: message.role,
 				content: message.content
 			};
 
-			// Add tool calls if present
-			if (message.toolCalls && message.toolCalls.length > 0) {
-				const toolInvocations = message.toolCalls.map((tc) => ({
-					state: 'result',
-					toolCallId: tc.id,
-					toolName: tc.name,
-					args: tc.arguments,
-					result: tc.result?.result
-				}));
-				aiMessage.toolInvocations = toolInvocations;
-			}
+			// // Add tool calls if present
+			// if (message.toolCalls && message.toolCalls.length > 0) {
+			// 	const toolInvocations = message.toolCalls.map((tc) => ({
+			// 		state: 'result',
+			// 		toolCallId: tc.id,
+			// 		toolName: tc.name,
+			// 		args: tc.arguments,
+			// 		result: tc.result?.result
+			// 	}));
+			// 	aiMessage.toolInvocations = toolInvocations;
+			// }
 
 			result.push(aiMessage);
 		}
@@ -338,20 +357,18 @@ export class OpenAIAdapter extends BaseAdapter {
 	/**
 	 * Build tools definition for AI SDK
 	 */
-	private buildTools(
-		tools: readonly IToolDefinition[]
-	): Record<string, AISDKToolDefinition> {
+	private buildTools(tools: readonly IToolDefinition[]): ToolSet {
 		if (tools.length === 0) {
 			return {};
 		}
 
-		const aiTools: Record<string, AISDKToolDefinition> = {};
+		const aiTools: ToolSet = {};
 
-		for (const tool of tools) {
-			aiTools[tool.name] = {
-				description: tool.description,
-				parameters: this.buildToolParameters(tool)
-			};
+		for (const meta of tools) {
+			aiTools[meta.name] = tool({
+				description: meta.description,
+				inputSchema: this.buildToolParameters(meta)
+			});
 		}
 
 		return aiTools;
@@ -360,29 +377,53 @@ export class OpenAIAdapter extends BaseAdapter {
 	/**
 	 * Build tool parameters schema
 	 */
-	private buildToolParameters(tool: IToolDefinition): AISDKToolParameters {
-		const properties: Record<string, AISDKPropertyDefinition> = {};
+	private buildToolParameters(tool: IToolDefinition): Schema {
+		const properties: Record<string, JSONSchema7> = {};
 		const requiredParams: string[] = [];
 
 		for (const param of tool.parameters) {
-			properties[param.name] = {
-				type: param.type,
-				description: param.description
-			};
-
-			if (param.enum) {
-				properties[param.name].enum = [...param.enum];
-			}
+			properties[param.name] = this.__buildNestedToolParameters(param);
 
 			if (param.required) {
 				requiredParams.push(param.name);
 			}
 		}
 
-		return {
+		return jsonSchema({
 			type: 'object',
 			properties,
 			required: requiredParams
+		});
+	}
+
+	private __buildNestedToolParameters(param: IToolParameter): JSONSchema7 {
+		const schema: JSONSchema7 = {
+			type: param.type,
+			description: param.description
 		};
+
+		if (param.enum) {
+			schema.enum = [...param.enum];
+		}
+
+		if (param.parameters && param.parameters.length > 0) {
+			const nestedProperties: Record<string, JSONSchema7> = {};
+			const nestedRequired: string[] = [];
+
+			for (const nestedParam of param.parameters) {
+				nestedProperties[nestedParam.name] =
+					this.__buildNestedToolParameters(nestedParam);
+
+				if (nestedParam.required) {
+					nestedRequired.push(nestedParam.name);
+				}
+			}
+
+			schema.type = 'object';
+			schema.properties = nestedProperties;
+			schema.required = nestedRequired;
+		}
+
+		return schema;
 	}
 }

@@ -65,7 +65,7 @@ NODE_ENV=development
 
 # OpenAI Configuration
 OPENAI_API_KEY=sk-your-openai-api-key-here
-OPENAI_DEFAULT_MODEL=gpt-4o
+OPENAI_DEFAULT_MODEL=gpt-5.2
 
 # CORS (use specific origins in production)
 CORS_ORIGIN=*
@@ -129,7 +129,7 @@ You can use a JSON configuration file instead of environment variables:
   "providers": {
     "openai": {
       "type": "openai",
-      "defaultModel": "gpt-4o",
+      "defaultModel": "gpt-5.2",
       "apiKey": "sk-..."
     }
   }
@@ -186,7 +186,7 @@ Authorization: Bearer YOUR-API-KEY-32-CHARS
     ],
     "tools": [],
     "conversationOptions": {
-      "model": "gpt-4o",
+      "model": "gpt-5.2",
       "temperature": 0.7
     },
     "instructions": "You are a helpful assistant."
@@ -289,7 +289,7 @@ interface UsageStats {
   userId: string;              // User ID from authentication
   apiKey: string;              // API key used
   provider: string;            // AI provider (openai, deepseek, etc.)
-  model: string;               // Model used (gpt-4o, etc.)
+  model: string;               // Model used (gpt-5.2, etc.)
   conversationId: string;      // Conversation ID
   responseId: string;          // Response ID
   promptTokens?: number;       // Input tokens

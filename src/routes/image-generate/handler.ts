@@ -52,7 +52,6 @@ export const imageGenerateHandler = asyncHandler(
 		try {
 			switch (providerConfig.type) {
 				case 'openai':
-				case 'deepseek':
 					adapter = new OpenAIImageAdapter({
 						apiKey: providerConfig.apiKey || '',
 						apiEndpoint: providerConfig.apiEndpoint,

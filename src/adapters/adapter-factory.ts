@@ -21,7 +21,6 @@ export class AdapterFactory {
 	static createAdapter(
 		provider: AIProvider,
 		config: ProviderConfig,
-		userApiKey?: string
 	): BaseAdapter {
 		const AdapterClass = this.adapters.get(provider);
 
@@ -30,7 +29,7 @@ export class AdapterFactory {
 		}
 
 		// Use user's API key if provided, otherwise use configured key
-		const apiKey = userApiKey || config.apiKey;
+		const apiKey = config.apiKey;
 
 		if (!apiKey) {
 			throw new Error(`API key is required for provider: ${provider}`);
@@ -38,7 +37,6 @@ export class AdapterFactory {
 
 		logger.debug('Creating adapter', {
 			provider,
-			hasUserKey: !!userApiKey,
 			hasDefaultKey: !!config.apiKey
 		});
 

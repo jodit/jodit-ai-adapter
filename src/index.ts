@@ -10,6 +10,7 @@ import { createApp } from './app';
 import { logger } from './helpers/logger';
 import { defaultConfig } from './config/default-config';
 import packageJson from '../package.json' with { type: 'json' };
+import merge from 'deepmerge';
 
 const { version } = packageJson;
 
@@ -70,10 +71,10 @@ export async function start(
 		...defaultConfig,
 		...config,
 		port: PORT,
-		providers: {
-			...defaultConfig.providers,
-			...(config?.providers || {})
-		}
+		providers: merge(
+			defaultConfig.providers,
+			(config?.providers || {})
+		)
 	};
 
 	// Add authentication callback if provided

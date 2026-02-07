@@ -2,6 +2,7 @@
  * Express types extensions
  */
 
+import type { ModelMessage, ToolSet } from 'ai';
 import type { Request } from 'express';
 
 /**
@@ -48,11 +49,11 @@ export interface StreamTextParams {
 	model: {
 		modelId: string;
 	};
-	messages: unknown[]; // CoreMessage[] from AI SDK
+	messages: ModelMessage[]; // ModelMessage[] from AI SDK
 	temperature?: number;
-	maxTokens?: number;
+	maxOutputTokens?: number;
 	abortSignal?: AbortSignal;
-	tools?: Record<string, AISDKToolDefinition>;
+	tools?: ToolSet;
 }
 
 /**
