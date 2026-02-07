@@ -14,6 +14,10 @@ describe('POST /ai/image/generate', () => {
 		nock.cleanAll();
 	});
 
+	afterAll(() => {
+		nock.restore();
+	});
+
 	it('should return 401 without API key', async () => {
 		const res = await request(app)
 			.post('/ai/image/generate')

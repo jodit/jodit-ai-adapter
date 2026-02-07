@@ -1,4 +1,5 @@
 import type { StartedTestContainer } from 'testcontainers';
+import { execFileSync } from 'node:child_process';
 
 export default async function teardown(): Promise<void> {
 	// Stop Redis container if it was started
@@ -11,8 +12,16 @@ export default async function teardown(): Promise<void> {
 		try {
 			await container.stop();
 			console.info('Redis container stopped');
-		} catch (error) {
-			console.error('Error stopping Redis container:', error);
+		} catch {
+			// testcontainers .stop() fails with Colima — fall back to CLI
+			try {
+				execFileSync('docker', ['rm', '-f', container.getId()], {
+					stdio: 'ignore'
+				});
+				console.info('Redis container stopped via docker CLI');
+			} catch {
+				// container may already be gone — ignore
+			}
 		}
 	}
 }

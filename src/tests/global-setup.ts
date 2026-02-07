@@ -1,6 +1,4 @@
 export default async function setup(): Promise<void> {
-	process.env.TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE = '/var/run/docker.sock';
-	process.env.TESTCONTAINERS_HOST_OVERRIDE ||= "127.0.0.1";
 	process.env.TESTCONTAINERS_RYUK_DISABLED ||= "true";
 
 	const { GenericContainer } = await import('testcontainers');
