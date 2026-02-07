@@ -9,7 +9,7 @@ import type { JSONSchema7TypeName } from 'json-schema';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function loadFixture(name: string) {
-	const filePath = path.join(__dirname, '__fixtures__', `${name}.json`);
+	const filePath = path.join(__dirname, '__fixtures__', 'openai', `${name}.json`);
 	return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 }
 

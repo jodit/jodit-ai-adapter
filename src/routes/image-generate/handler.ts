@@ -53,8 +53,8 @@ export const imageGenerateHandler = (config: AppConfig) =>
 		// Create abort controller for request cancellation
 		const abortController = new AbortController();
 
-		req.on('close', () => {
-			if (!res.writableEnded) {
+		res.on('close', () => {
+			if (!res.writableFinished) {
 				logger.warn('Client disconnected, aborting image generation');
 				abortController.abort();
 			}

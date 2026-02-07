@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const FIXTURES_DIR = path.join(__dirname, '..', 'src', 'adapters', '__fixtures__');
+const FIXTURES_DIR = path.join(__dirname, '..', 'src', 'adapters', '__fixtures__', 'openai');
 
 // Ensure fixtures directory exists
 fs.mkdirSync(FIXTURES_DIR, { recursive: true });
