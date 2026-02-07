@@ -3,7 +3,6 @@ import asyncHandler from 'express-async-handler';
 import Boom from '@hapi/boom';
 import type { AppConfig, AuthenticatedRequest } from '../../types';
 import { AdapterFactory } from '../../adapters/adapter-factory';
-import { OpenAIAdapter } from '../../adapters/openai-adapter';
 import { logger } from '../../helpers/logger';
 import { ImageGenerationAPIRequestSchema } from './schema';
 
@@ -43,12 +42,6 @@ export const imageGenerateHandler = (config: AppConfig) =>
 		}
 
 		const adapter = AdapterFactory.createAdapter(provider, providerConfig);
-
-		if (!(adapter instanceof OpenAIAdapter)) {
-			throw Boom.badRequest(
-				`Image generation not supported for provider type: ${providerConfig.type}`
-			);
-		}
 
 		// Create abort controller for request cancellation
 		const abortController = new AbortController();

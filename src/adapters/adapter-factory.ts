@@ -1,5 +1,5 @@
 import type { AIProvider, ProviderConfig } from '../types';
-import type { BaseAdapter } from './base-adapter';
+import { BaseAdapter, type BaseAdapterConfig } from './base-adapter';
 import { OpenAIAdapter } from './openai-adapter';
 import { logger } from '../helpers/logger';
 
@@ -7,7 +7,7 @@ import { logger } from '../helpers/logger';
  * Factory for creating AI provider adapters
  */
 export class AdapterFactory {
-	private static adapters: Map<string, typeof OpenAIAdapter> = new Map([
+	private static adapters: Map<string, new (config: BaseAdapterConfig) => BaseAdapter> = new Map([
 		['openai', OpenAIAdapter]
 		// Add other adapters here as they are implemented:
 		// ['deepseek', DeepSeekAdapter],

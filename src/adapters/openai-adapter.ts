@@ -1,32 +1,20 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import {
 	// streamText,
-	tool,
 	generateText,
-	generateImage,
-	ModelMessage,
-	ToolSet,
-	Schema,
-	jsonSchema,
-	JSONSchema7
+	generateImage
 } from 'ai';
 import type {
 	IAIRequestContext,
 	IAIAssistantResult,
-	IAIMessage,
-	IToolDefinition,
 	StreamTextParams,
-	IToolParameter,
 	IAIResponse,
-	IToolCall,
 	IImageGenerationRequest,
 	IImageGenerationResponse
 } from '../types';
 import { BaseAdapter, type BaseAdapterConfig } from './base-adapter';
 import { logger } from '../helpers/logger';
 import { createFetch } from '../helpers/proxy';
-
-type GenerateTextResult = Awaited<ReturnType<typeof generateText>>;
 
 /**
  * OpenAI adapter using Vercel AI SDK
@@ -57,10 +45,7 @@ export class OpenAIAdapter extends BaseAdapter {
 		signal: AbortSignal
 	): Promise<IAIAssistantResult> {
 		// Determine model to use
-		const model =
-			context.conversationOptions?.model ||
-			this.config.defaultModel ||
-			'gpt-5.2';
+		const model = this.resolveModel(context, 'gpt-5.2');
 
 		// Build messages for the AI
 		const messages = this.buildMessages(context);
@@ -87,25 +72,6 @@ export class OpenAIAdapter extends BaseAdapter {
 
 		// For non-streaming mode
 		return await this.handleNonStreaming(commonParams, context);
-	}
-
-	/**
-	 * Extract tool calls from AI SDK response
-	 */
-	private extractToolCalls(response: GenerateTextResult): Array<IToolCall> {
-		const toolCalls = response.toolCalls;
-		if (!Array.isArray(toolCalls)) {
-			return [];
-		}
-
-		return toolCalls.map((tc): IToolCall => {
-			return {
-				id: tc.toolCallId,
-				name: tc.toolName,
-				arguments: tc.input,
-				status: 'pending'
-			};
-		});
 	}
 
 	/**
@@ -262,7 +228,7 @@ export class OpenAIAdapter extends BaseAdapter {
 	}
 
 	/**
-	 * Generate images using Vercel AI SDK
+	 * Generate images using Vercel AI SDK (OpenAI-specific)
 	 */
 	async handleImageGeneration(
 		request: IImageGenerationRequest,
@@ -311,172 +277,5 @@ export class OpenAIAdapter extends BaseAdapter {
 				usage: result.usage
 			}
 		};
-	}
-
-	/**
-	 * Build messages array for AI SDK
-	 * Returns ModelMessage[] compatible with Vercel AI SDK
-	 */
-	private buildMessages(context: IAIRequestContext): ModelMessage[] {
-		const messages: ModelMessage[] = [];
-
-		// Add system instructions if provided
-		if (context.instructions) {
-			messages.push({
-				role: 'system',
-				content: context.instructions
-			});
-		}
-
-		// Add conversation messages
-		if (context.messages) {
-			for (const msg of context.messages) {
-				messages.push(...this.convertMessage(msg));
-			}
-		}
-
-		// Add selection contexts as user messages if any
-		if (context.selectionContexts && context.selectionContexts.length > 0) {
-			const contextText = context.selectionContexts
-				.map((ctx, idx) => `Context ${idx + 1}:\n${ctx.html}`)
-				.join('\n\n');
-
-			messages.push({
-				role: 'user',
-				content: `Here is the selected content from the editor:\n\n${contextText}`
-			});
-		}
-
-		return messages;
-	}
-
-	/**
-	 * Convert Jodit message to AI SDK format
-	 * Returns ModelMessage[] compatible with Vercel AI SDK
-	 */
-	private convertMessage(message: IAIMessage): ModelMessage[] {
-		const result: ModelMessage[] = [];
-
-		// Handle tool result messages
-		if (message.role === 'tool' && message.toolResults) {
-			for (const toolResult of message.toolResults) {
-				result.push({
-					role: 'tool',
-					content: [
-						{
-							type: 'tool-result',
-							toolCallId: toolResult.toolCallId,
-							toolName: '', // Tool name is not provided in toolResults, can be enhanced if needed,
-							output:
-								'error' in toolResult
-									? {
-											type: 'text',
-											value: `Error: ${toolResult.error}`
-										}
-									: { type: 'json', value: toolResult.result }
-						}
-					]
-				});
-			}
-
-			return result;
-		}
-
-		// Handle regular messages
-		if (message.content && message.role !== 'tool') {
-			const aiMessage: ModelMessage = {
-				role: message.role,
-				content: message.content
-			};
-
-			// // Add tool calls if present
-			// if (message.toolCalls && message.toolCalls.length > 0) {
-			// 	const toolInvocations = message.toolCalls.map((tc) => ({
-			// 		state: 'result',
-			// 		toolCallId: tc.id,
-			// 		toolName: tc.name,
-			// 		args: tc.arguments,
-			// 		result: tc.result?.result
-			// 	}));
-			// 	aiMessage.toolInvocations = toolInvocations;
-			// }
-
-			result.push(aiMessage);
-		}
-
-		return result;
-	}
-
-	/**
-	 * Build tools definition for AI SDK
-	 */
-	private buildTools(tools: readonly IToolDefinition[]): ToolSet {
-		if (tools.length === 0) {
-			return {};
-		}
-
-		const aiTools: ToolSet = {};
-
-		for (const meta of tools) {
-			aiTools[meta.name] = tool({
-				description: meta.description,
-				inputSchema: this.buildToolParameters(meta)
-			});
-		}
-
-		return aiTools;
-	}
-
-	/**
-	 * Build tool parameters schema
-	 */
-	private buildToolParameters(tool: IToolDefinition): Schema {
-		const properties: Record<string, JSONSchema7> = {};
-		const requiredParams: string[] = [];
-
-		for (const param of tool.parameters) {
-			properties[param.name] = this.__buildNestedToolParameters(param);
-
-			if (param.required) {
-				requiredParams.push(param.name);
-			}
-		}
-
-		return jsonSchema({
-			type: 'object',
-			properties,
-			required: requiredParams
-		});
-	}
-
-	private __buildNestedToolParameters(param: IToolParameter): JSONSchema7 {
-		const schema: JSONSchema7 = {
-			type: param.type,
-			description: param.description
-		};
-
-		if (param.enum) {
-			schema.enum = [...param.enum];
-		}
-
-		if (param.parameters && param.parameters.length > 0) {
-			const nestedProperties: Record<string, JSONSchema7> = {};
-			const nestedRequired: string[] = [];
-
-			for (const nestedParam of param.parameters) {
-				nestedProperties[nestedParam.name] =
-					this.__buildNestedToolParameters(nestedParam);
-
-				if (nestedParam.required) {
-					nestedRequired.push(nestedParam.name);
-				}
-			}
-
-			schema.type = 'object';
-			schema.properties = nestedProperties;
-			schema.required = nestedRequired;
-		}
-
-		return schema;
 	}
 }
