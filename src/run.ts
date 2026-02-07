@@ -21,10 +21,10 @@ function loadConfig(): Partial<AppConfig> | undefined {
 		try {
 			return JSON.parse(process.env.CONFIG);
 		} catch (error) {
-			logger.error('Failed to parse CONFIG environment variable', {
-				error
+			logger.error(error);
+			throw new Error('Invalid CONFIG JSON', {
+				cause: error
 			});
-			throw new Error('Invalid CONFIG JSON');
 		}
 	}
 
@@ -35,11 +35,13 @@ function loadConfig(): Partial<AppConfig> | undefined {
 			const configContent = readFileSync(configPath, 'utf-8');
 			return JSON.parse(configContent);
 		} catch (error) {
-			logger.error('Failed to load config file', {
+			logger.error({
 				path: process.env.CONFIG_FILE,
 				error
 			});
-			throw new Error(`Failed to load config file: ${process.env.CONFIG_FILE}`);
+			throw new Error(`Failed to load config file: ${process.env.CONFIG_FILE}`, {
+				cause: error
+			});
 		}
 	}
 

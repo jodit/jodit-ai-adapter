@@ -343,7 +343,7 @@ export abstract class BaseAdapter {
 			return {
 				id: tc.toolCallId,
 				name: tc.toolName,
-				arguments: tc.input,
+				arguments: tc.input as Record<string, unknown>,
 				status: 'pending'
 			};
 		});

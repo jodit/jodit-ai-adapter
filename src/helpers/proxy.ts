@@ -20,9 +20,12 @@ export function createProxyFetch(proxyUrl: string): typeof fetch {
 			});
 		};
 	} catch (error) {
-		logger.error('Failed to create proxy agent:', error);
+		logger.error(error);
 		throw new Error(
-			`Failed to create proxy agent with URL ${proxyUrl}: ${error instanceof Error ? error.message : 'Unknown error'}`
+			`Failed to create proxy agent with URL ${proxyUrl}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+			{
+				cause: error
+			}
 		);
 	}
 }
