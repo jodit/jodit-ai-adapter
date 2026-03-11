@@ -8,7 +8,13 @@ import type { AppConfig } from '../../types/index.js';
 import { createApp } from '../../app.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const FIXTURES_DIR = path.join(__dirname, '..', '..', 'adapters', '__fixtures__');
+const FIXTURES_DIR = path.join(
+	__dirname,
+	'..',
+	'..',
+	'adapters',
+	'__fixtures__'
+);
 
 export const OPENAI_BASE = 'https://api.openai.com';
 
@@ -60,23 +66,27 @@ export function mockStreamingFixture(provider: string, name: string) {
 
 	const scope = nock(OPENAI_BASE)
 		.post('/v1/responses')
-		.reply(200, () => {
-			const stream = new PassThrough();
+		.reply(
+			200,
+			() => {
+				const stream = new PassThrough();
 
-			let i = 0;
-			const push = () => {
-				if (i < events.length) {
-					stream.write(events[i] + '\n\n');
-					i++;
-					setTimeout(push, 1);
-				} else {
-					stream.end();
-				}
-			};
-			push();
+				let i = 0;
+				const push = () => {
+					if (i < events.length) {
+						stream.write(events[i] + '\n\n');
+						i++;
+						setTimeout(push, 1);
+					} else {
+						stream.end();
+					}
+				};
+				push();
 
-			return stream;
-		}, { 'Content-Type': 'text/event-stream' });
+				return stream;
+			},
+			{ 'Content-Type': 'text/event-stream' }
+		);
 
 	return { scope, events };
 }
@@ -85,7 +95,10 @@ export function mockStreamingFixture(provider: string, name: string) {
  * Create a fully wired Express app for testing.
  * No proxy, no rate-limiting, test-friendly auth.
  */
-export function createTestApp(overrides?: Partial<AppConfig>): Application {
+export function createTestApp(overrides?: Partial<AppConfig>): {
+	app: Application;
+	cleanup: () => Promise<unknown>;
+} {
 	const config: AppConfig = {
 		port: 0,
 		debug: false,

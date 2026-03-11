@@ -8,7 +8,14 @@ import {
 } from '../__tests__/setup.js';
 
 describe('POST /ai/image/generate', () => {
-	const app = createTestApp();
+	let mainApp: ReturnType<typeof createTestApp>;
+	beforeAll(() => {
+		mainApp = createTestApp();
+	});
+
+	afterAll(async () => {
+		await mainApp.cleanup();
+	});
 
 	afterEach(() => {
 		nock.cleanAll();
@@ -19,7 +26,7 @@ describe('POST /ai/image/generate', () => {
 	});
 
 	it('should return 401 without API key', async () => {
-		const res = await request(app)
+		const res = await request(mainApp.app)
 			.post('/ai/image/generate')
 			.send({
 				provider: 'openai',
@@ -30,7 +37,7 @@ describe('POST /ai/image/generate', () => {
 	});
 
 	it('should return 400 for invalid body', async () => {
-		const res = await request(app)
+		const res = await request(mainApp.app)
 			.post('/ai/image/generate')
 			.set(authHeader())
 			.send({ provider: '' });
@@ -39,7 +46,7 @@ describe('POST /ai/image/generate', () => {
 	});
 
 	it('should return 400 for missing prompt', async () => {
-		const res = await request(app)
+		const res = await request(mainApp.app)
 			.post('/ai/image/generate')
 			.set(authHeader())
 			.send({
@@ -53,7 +60,7 @@ describe('POST /ai/image/generate', () => {
 	it('should proxy image generation through OpenAI', async () => {
 		mockFixture('openai', 'image-generation');
 
-		const res = await request(app)
+		const res = await request(mainApp.app)
 			.post('/ai/image/generate')
 			.set(authHeader())
 			.send({
@@ -76,16 +83,18 @@ describe('POST /ai/image/generate', () => {
 	});
 
 	it('should handle OpenAI API errors', async () => {
-		nock(OPENAI_BASE).post('/v1/images/generations').reply(500, {
-			error: {
-				message: 'Internal server error',
-				type: 'server_error',
-				param: null,
-				code: null
-			}
-		});
+		nock(OPENAI_BASE)
+			.post('/v1/images/generations')
+			.reply(500, {
+				error: {
+					message: 'Internal server error',
+					type: 'server_error',
+					param: null,
+					code: null
+				}
+			});
 
-		const res = await request(app)
+		const res = await request(mainApp.app)
 			.post('/ai/image/generate')
 			.set(authHeader())
 			.send({
@@ -102,7 +111,7 @@ describe('POST /ai/image/generate', () => {
 	});
 
 	it('should return 400 for unsupported provider', async () => {
-		const res = await request(app)
+		const res = await request(mainApp.app)
 			.post('/ai/image/generate')
 			.set(authHeader())
 			.send({

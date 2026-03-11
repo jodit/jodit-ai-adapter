@@ -119,7 +119,7 @@ Main application setup:
 - Streaming response handling (SSE)
 
 #### Entry Points
-- `src/index.ts` - Library entry point with `start()` and `stop()`
+- `src/index.ts` - Library entry point with `start()` (returns `{ app, cleanup }`)
 - `src/run.ts` - CLI entry point for standalone server
 
 ## Request Flow
@@ -301,7 +301,7 @@ Add custom middleware in `src/app.ts`:
 ```typescript
 import { rateLimitMiddleware } from './middlewares/rate-limit';
 
-export function createApp(config: AppConfig): Express {
+export function createApp(config: AppConfig): { app: Application; cleanup: () => Promise<unknown> } {
   const app = express();
 
   // ... existing middlewares

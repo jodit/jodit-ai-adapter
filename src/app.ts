@@ -27,9 +27,13 @@ export function createApp(
 	config: AppConfig,
 	existingApp?: Application,
 	existingRouter?: Router
-): Application {
+): {
+	app: Application,
+	cleanup: () => Promise<unknown>;
+} {
 	const app = existingApp || express();
 	const router = existingRouter || Router();
+	const cleanups: (() => Promise<void>)[] = []; 
 
 	// Store config in router closure (not app.locals for isolation)
 	const appConfig = config;
@@ -81,6 +85,7 @@ export function createApp(
 			const cleanup = async (): Promise<void> => {
 				await rateLimiter.close();
 			};
+			cleanups.push(cleanup);
 			process.on('SIGINT', cleanup);
 			process.on('SIGTERM', cleanup);
 		} catch (error) {
@@ -140,5 +145,12 @@ export function createApp(
 	// Mount router to app at configured prefix
 	app.use(config.routePrefix ?? '/ai', router);
 
-	return app;
+	return {
+		app,
+		cleanup(): Promise<unknown> {
+			return Promise.allSettled(
+				cleanups.map((cleanup) => cleanup())
+			);
+		}
+	};
 }

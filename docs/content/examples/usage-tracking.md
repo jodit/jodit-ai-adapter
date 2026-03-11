@@ -7,7 +7,7 @@ This document provides examples of implementing usage tracking for the Jodit AI 
 ```typescript
 import { start, type UsageStats } from 'jodit-ai-adapter';
 
-await start({
+const { cleanup } = await start({
   port: 8082,
   onUsage: async (stats: UsageStats) => {
     console.log('AI Usage:', {
@@ -19,6 +19,8 @@ await start({
     });
   }
 });
+
+// Call cleanup() to gracefully shut down
 ```
 
 ## Database Integration

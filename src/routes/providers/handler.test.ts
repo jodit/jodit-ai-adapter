@@ -2,15 +2,22 @@ import request from 'supertest';
 import { createTestApp, authHeader } from '../__tests__/setup.js';
 
 describe('GET /ai/providers', () => {
-	const app = createTestApp();
+	let result: ReturnType<typeof createTestApp>;
+	beforeAll(() => {
+		result = createTestApp();
+	});
+
+	afterAll(async () => {
+		await result.cleanup();
+	});
 
 	it('should return 401 without API key', async () => {
-		const res = await request(app).get('/ai/providers');
+		const res = await request(result.app).get('/ai/providers');
 		expect(res.status).toBe(401);
 	});
 
 	it('should return providers list with valid API key', async () => {
-		const res = await request(app)
+		const res = await request(result.app)
 			.get('/ai/providers')
 			.set(authHeader());
 
@@ -41,17 +48,18 @@ describe('GET /ai/providers', () => {
 			}
 		});
 
-		const res = await request(appWithDisabled)
+		const res = await request(appWithDisabled.app)
 			.get('/ai/providers')
 			.set(authHeader());
 
 		expect(res.status).toBe(200);
 		expect(res.body.providers).toHaveLength(1);
 		expect(res.body.providers[0].name).toBe('deepseek');
+		await appWithDisabled.cleanup();;
 	});
 
 	it('should include providers without explicit enabled field', async () => {
-		const res = await request(app)
+		const res = await request(result.app)
 			.get('/ai/providers')
 			.set(authHeader());
 

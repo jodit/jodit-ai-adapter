@@ -13,7 +13,7 @@ npm install jodit-ai-adapter
 ```typescript
 import { start } from 'jodit-ai-adapter';
 
-await start({
+const { app, cleanup } = await start({
   port: 8082,
   providers: {
     openai: {
@@ -23,9 +23,13 @@ await start({
     }
   }
 });
+
+// To gracefully shut down:
+// await cleanup();
 ```
 
 The server is now running at `http://localhost:8082`.
+The `cleanup()` function stops the server and releases all resources (e.g. Redis connections).
 
 ## Embed Into Existing Express App
 
@@ -39,7 +43,7 @@ const app = express();
 
 // ... your existing routes and middleware
 
-await start({
+const { cleanup } = await start({
   existingApp: app,
   config: {
     providers: {
@@ -53,6 +57,9 @@ await start({
 });
 
 app.listen(3000);
+
+// To gracefully shut down:
+// await cleanup();
 ```
 
 All AI routes will be available under `/ai/*` (e.g. `/ai/health`, `/ai/request`).

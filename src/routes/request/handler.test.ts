@@ -9,7 +9,14 @@ import {
 } from '../__tests__/setup.js';
 
 describe('POST /ai/request', () => {
-	const app = createTestApp();
+	let result: ReturnType<typeof createTestApp>;
+	beforeAll(() => {
+		result = createTestApp();
+	});
+
+	afterAll(async () => {
+		await result.cleanup();
+	});
 
 	afterEach(() => {
 		nock.cleanAll();
@@ -20,7 +27,7 @@ describe('POST /ai/request', () => {
 	});
 
 	it('should return 401 without API key', async () => {
-		const res = await request(app)
+		const res = await request(result.app)
 			.post('/ai/request')
 			.send({ provider: 'openai', context: {} });
 
@@ -28,7 +35,7 @@ describe('POST /ai/request', () => {
 	});
 
 	it('should return 400 for invalid body', async () => {
-		const res = await request(app)
+		const res = await request(result.app)
 			.post('/ai/request')
 			.set(authHeader())
 			.send({ provider: '' });
@@ -37,7 +44,7 @@ describe('POST /ai/request', () => {
 	});
 
 	it('should return 400 for unsupported provider', async () => {
-		const res = await request(app)
+		const res = await request(result.app)
 			.post('/ai/request')
 			.set(authHeader())
 			.send({
@@ -54,7 +61,7 @@ describe('POST /ai/request', () => {
 	it('should proxy text generation through OpenAI', async () => {
 		const { fixture } = mockFixture('openai', 'text-generation');
 
-		const res = await request(app)
+		const res = await request(result.app)
 			.post('/ai/request')
 			.set(authHeader())
 			.send({
@@ -85,7 +92,7 @@ describe('POST /ai/request', () => {
 	it('should return tool calls from OpenAI', async () => {
 		mockFixture('openai', 'text-with-tools');
 
-		const res = await request(app)
+		const res = await request(result.app)
 			.post('/ai/request')
 			.set(authHeader())
 			.send({
@@ -131,7 +138,7 @@ describe('POST /ai/request', () => {
 	it('should stream SSE events for streaming request', async () => {
 		mockStreamingFixture('openai', 'text-generation-streaming');
 
-		const res = await request(app)
+		const res = await request(result.app)
 			.post('/ai/request')
 			.set(authHeader())
 			.send({
@@ -180,7 +187,7 @@ describe('POST /ai/request', () => {
 	it('should stream tool calls via SSE', async () => {
 		mockStreamingFixture('openai', 'text-with-tools-streaming');
 
-		const res = await request(app)
+		const res = await request(result.app)
 			.post('/ai/request')
 			.set(authHeader())
 			.send({
@@ -246,7 +253,7 @@ describe('POST /ai/request', () => {
 			}
 		});
 
-		const res = await request(app)
+		const res = await request(result.app)
 			.post('/ai/request')
 			.set(authHeader())
 			.send({

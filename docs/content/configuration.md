@@ -76,7 +76,7 @@ When using the package as a library in your own app:
 ```typescript
 import { start } from 'jodit-ai-adapter';
 
-await start({
+const { app, cleanup } = await start({
   port: 8082,
   config: {
     routePrefix: '/api/v1',
@@ -95,6 +95,9 @@ await start({
     }
   }
 });
+
+// To gracefully shut down (stops server + releases resources):
+// await cleanup();
 ```
 
 See [Rate Limiting](rate-limiting.md) for advanced rate limiting options (Redis, per-user limits, etc.).

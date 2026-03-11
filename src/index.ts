@@ -18,7 +18,14 @@ let server: Server | null = null;
 
 // Re-export for direct use
 export { createApp };
-export type { AppConfig, AuthCallback, UsageCallback, UsageStats, Application, Router };
+export type {
+	AppConfig,
+	AuthCallback,
+	UsageCallback,
+	UsageStats,
+	Application,
+	Router
+};
 export * from './types';
 
 /**
@@ -40,7 +47,7 @@ export interface StartOptions {
 export async function start(
 	options?: StartOptions | number,
 	customConfig?: Partial<AppConfig>
-): Promise<Server | Application> {
+): Promise<{ app: Application; cleanup: () => Promise<unknown> }> {
 	// Support both old signature (port, config) and new (options object)
 	let PORT: number;
 	let config: Partial<AppConfig> | undefined;
@@ -71,10 +78,7 @@ export async function start(
 		...defaultConfig,
 		...config,
 		port: PORT,
-		providers: merge(
-			defaultConfig.providers,
-			(config?.providers || {})
-		)
+		providers: merge(defaultConfig.providers, config?.providers || {})
 	};
 
 	// Add authentication callback if provided
@@ -92,7 +96,9 @@ export async function start(
 		// INTEGRATION MODE: Mount to existing app, don't start server
 		const app = createApp(finalConfig, existingApp, existingRouter);
 		logger.info('AI Adapter integrated as middleware at /ai/*');
-		logger.info(`Supported providers: ${Object.keys(finalConfig.providers).join(', ')}`);
+		logger.info(
+			`Supported providers: ${Object.keys(finalConfig.providers).join(', ')}`
+		);
 		return app;
 	}
 
@@ -100,10 +106,12 @@ export async function start(
 	const app = createApp(finalConfig);
 
 	return new Promise((resolve, reject) => {
-		server = app.listen(PORT, (): void => {
+		server = app.app.listen(PORT, (): void => {
 			const message = `Jodit AI Adapter v${version} listening on port ${PORT}`;
 			logger.info(message);
-			logger.info(`Supported providers: ${Object.keys(finalConfig.providers).join(', ')}`);
+			logger.info(
+				`Supported providers: ${Object.keys(finalConfig.providers).join(', ')}`
+			);
 
 			if (process.env.NODE_ENV === 'development') {
 				logger.info('Environment: development');
@@ -111,60 +119,38 @@ export async function start(
 			}
 
 			if (server) {
-				resolve(server);
+				resolve(app);
 			}
 		});
 
 		server.on('error', reject);
-	});
-}
 
-/**
- * Stop the adapter service
- */
-export async function stop(): Promise<void> {
-	if (server === null || server === undefined) {
-		logger.warn('Server is not running');
-		return;
-	}
-
-	return new Promise((resolve, reject) => {
-		server?.close((err?: Error) => {
-			if (err !== null && err !== undefined) {
-				logger.error(`Error during server shutdown: ${err.message}`);
-				reject(err);
-			} else {
-				logger.info('Server closed');
-				server = null;
-				resolve();
+		/**
+		 * Stop the adapter service
+		 */
+		const stop = async (): Promise<void> => {
+			if (server === null || server === undefined) {
+				logger.warn('Server is not running');
+				return;
 			}
-		});
+
+			return new Promise((resolve, reject) => {
+				server?.close((err?: Error) => {
+					if (err !== null && err !== undefined) {
+						logger.error(
+							`Error during server shutdown: ${err.message}`
+						);
+						reject(err);
+					} else {
+						logger.info('Server closed');
+						server = null;
+						resolve();
+					}
+				});
+			});
+		};
+
+		const originalCleanup = app.cleanup;
+		app.cleanup = (): Promise<unknown> => Promise.allSettled([originalCleanup(), stop()]);
 	});
 }
-
-/**
- * Graceful shutdown handler
- */
-const shutdown = async (signal: string): Promise<void> => {
-	logger.info(`Received ${signal}, shutting down gracefully`);
-
-	try {
-		await stop();
-		process.exit(0);
-	} catch (error) {
-		logger.error(
-			`Error during shutdown: ${error instanceof Error ? error.message : String(error)}`
-		);
-		process.exit(1);
-	}
-};
-
-// Handle shutdown signals
-process.once('SIGTERM', () => shutdown('SIGTERM'));
-process.once('SIGINT', () => shutdown('SIGINT'));
-
-// Handle unhandled rejections
-process.once('unhandledRejection', async (err) => {
-	logger.error(`unhandledRejection: ${err}`);
-	await shutdown('unhandledRejection');
-});
