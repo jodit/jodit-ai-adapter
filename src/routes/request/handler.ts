@@ -197,27 +197,42 @@ export const aiRequestHandler = (config: AppConfig) =>
 
 				let finalResponse: IAIResponse | null = null;
 
-				// Stream events
-				for await (const event of result.stream) {
-					const data = event.type === 'error' ? JSON.stringify({
-						type: 'error',
-						message: event.error.message,
-					}) : JSON.stringify(event);
-					res.write(`event: ${event.type}\n`);
-					res.write(`data: ${data}\n\n`);
+				try {
+					// Stream events
+					for await (const event of result.stream) {
+						const data = event.type === 'error' ? JSON.stringify({
+							type: 'error',
+							message: event.error.message,
+						}) : JSON.stringify(event);
+						res.write(`event: ${event.type}\n`);
+						res.write(`data: ${data}\n\n`);
 
-					// Capture completed event for usage tracking
-					if (event.type === 'completed') {
-						finalResponse = event.response;
-					}
+						// Capture completed event for usage tracking
+						if (event.type === 'completed') {
+							finalResponse = event.response;
+						}
 
-					// Flush if available (compatibility with different Node versions)
-					const flushableRes = res as {
-						flush?: () => void;
-					};
-					if (typeof flushableRes.flush === 'function') {
-						flushableRes.flush();
+						// Flush if available (compatibility with different Node versions)
+						const flushableRes = res as {
+							flush?: () => void;
+						};
+						if (typeof flushableRes.flush === 'function') {
+							flushableRes.flush();
+						}
 					}
+				} catch (streamError) {
+					// Error escaped the stream generator — send it as SSE error event
+					const message = streamError instanceof Error
+						? streamError.message
+						: String(streamError);
+					logger.error('Stream iteration error:', streamError);
+					res.write(`event: error\n`);
+					res.write(`data: ${JSON.stringify({ type: 'error', message })}\n\n`);
+				}
+
+				// If stream ended without a completed event, notify the client
+				if (!finalResponse) {
+					logger.warn('Stream ended without completed event', { provider });
 				}
 
 				res.end();

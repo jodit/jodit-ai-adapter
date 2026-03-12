@@ -277,4 +277,109 @@ describe('POST /ai/request', () => {
 		expect(res.body.result.content).toContain('Error');
 		expect(res.body.result.metadata?.error).toBe(true);
 	});
+
+	it('should send SSE error event when provider returns insufficient_quota during streaming', async () => {
+		mockStreamingFixture('openai', 'streaming-error-insufficient-quota');
+
+		const res = await request(result.app)
+			.post('/ai/request')
+			.set(authHeader())
+			.send({
+				provider: 'openai',
+				context: {
+					mode: 'full',
+					messages: [
+						{
+							id: 'msg-1',
+							role: 'user',
+							content: 'Hello',
+							timestamp: Date.now()
+						}
+					],
+					tools: [],
+					metadata: { stream: true }
+				}
+			});
+
+		expect(res.status).toBe(200);
+		expect(res.headers['content-type']).toContain('text/event-stream');
+
+		const sseBlocks = res.text.split('\n\n').filter(Boolean);
+		const events = sseBlocks.map(block => {
+			const lines = block.split('\n');
+			const eventLine = lines.find(l => l.startsWith('event: '));
+			const dataLine = lines.find(l => l.startsWith('data: '));
+			return {
+				type: eventLine?.slice(7),
+				data: dataLine ? JSON.parse(dataLine.slice(6)) : null
+			};
+		});
+
+		const types = events.map(e => e.type);
+
+		// Should have a created event followed by an error event
+		expect(types).toContain('created');
+		expect(types).toContain('error');
+
+		// Should NOT have a completed event
+		expect(types).not.toContain('completed');
+
+		// Error event should contain a meaningful message
+		const errorEvent = events.find(e => e.type === 'error');
+		expect(errorEvent?.data.type).toBe('error');
+		expect(errorEvent?.data.message).toBeDefined();
+		expect(errorEvent?.data.message.length).toBeGreaterThan(0);
+	});
+
+	it('should send SSE error event when provider returns 401 during streaming', async () => {
+		nock(OPENAI_BASE).post('/v1/responses').reply(401, {
+			error: {
+				message: 'Incorrect API key provided',
+				type: 'invalid_request_error',
+				param: null,
+				code: 'invalid_api_key'
+			}
+		});
+
+		const res = await request(result.app)
+			.post('/ai/request')
+			.set(authHeader())
+			.send({
+				provider: 'openai',
+				context: {
+					mode: 'full',
+					messages: [
+						{
+							id: 'msg-1',
+							role: 'user',
+							content: 'Hello',
+							timestamp: Date.now()
+						}
+					],
+					tools: [],
+					metadata: { stream: true }
+				}
+			});
+
+		expect(res.status).toBe(200);
+		expect(res.headers['content-type']).toContain('text/event-stream');
+
+		const sseBlocks = res.text.split('\n\n').filter(Boolean);
+		const events = sseBlocks.map(block => {
+			const lines = block.split('\n');
+			const eventLine = lines.find(l => l.startsWith('event: '));
+			const dataLine = lines.find(l => l.startsWith('data: '));
+			return {
+				type: eventLine?.slice(7),
+				data: dataLine ? JSON.parse(dataLine.slice(6)) : null
+			};
+		});
+
+		const types = events.map(e => e.type);
+		expect(types).toContain('error');
+		expect(types).not.toContain('completed');
+
+		const errorEvent = events.find(e => e.type === 'error');
+		expect(errorEvent?.data.message).toBeDefined();
+	});
 });

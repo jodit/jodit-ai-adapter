@@ -15,6 +15,7 @@ import healthRouter from './routes/health';
 import { createImageGenerateRouter } from './routes/image-generate';
 import { createAiRequestRouter } from './routes/request';
 import { createAiProvidersRouter } from './routes/providers';
+import packageJson from '../package.json' with { type: 'json' };
 
 /**
  * Create Express application or mount to existing one
@@ -28,12 +29,22 @@ export function createApp(
 	existingApp?: Application,
 	existingRouter?: Router
 ): {
-	app: Application,
+	app: Application;
 	cleanup: () => Promise<unknown>;
 } {
-	const app = existingApp || express();
+	const app =
+		existingApp ||
+		express()
+			.disable('x-powered-by')
+			.use((_req, res, next) => {
+				if (packageJson.version) {
+					res.header('X-AI-Adapter-version', packageJson.version);
+				}
+				next();
+			});
+			
 	const router = existingRouter || Router();
-	const cleanups: (() => Promise<void>)[] = []; 
+	const cleanups: (() => Promise<void>)[] = [];
 
 	// Store config in router closure (not app.locals for isolation)
 	const appConfig = config;
@@ -90,7 +101,9 @@ export function createApp(
 			process.on('SIGTERM', cleanup);
 		} catch (error) {
 			logger.error('Failed to initialize rate limiter:', error);
-			logger.warn('Rate limiting is disabled due to initialization error');
+			logger.warn(
+				'Rate limiting is disabled due to initialization error'
+			);
 		}
 	} else {
 		logger.info('Rate limiting is disabled');
@@ -148,9 +161,7 @@ export function createApp(
 	return {
 		app,
 		cleanup(): Promise<unknown> {
-			return Promise.allSettled(
-				cleanups.map((cleanup) => cleanup())
-			);
+			return Promise.allSettled(cleanups.map((cleanup) => cleanup()));
 		}
 	};
 }

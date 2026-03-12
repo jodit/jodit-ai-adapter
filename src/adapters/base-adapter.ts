@@ -125,7 +125,11 @@ export abstract class BaseAdapter {
 			abortSignal: params.abortSignal,
 			maxOutputTokens: params.maxOutputTokens,
 			tools: params.tools,
-			providerOptions: this.getProviderOptions(context)
+			providerOptions: this.getProviderOptions(context),
+			onError: ({ error }) => {
+				logger.error('streamText error');
+				logger.error(error);
+			}
 		});
 
 		const responseId = this.generateResponseId('stream');
@@ -136,6 +140,7 @@ export abstract class BaseAdapter {
 			mode: 'stream',
 			stream: (async function* (): AsyncGenerator<AIStreamEvent> {
 				let fullText = '';
+				let hasError = false;
 
 				try {
 					yield {
@@ -157,32 +162,49 @@ export abstract class BaseAdapter {
 								};
 								break;
 							}
+							case 'error': {
+								hasError = true;
+								const errorMessage = part.error instanceof Error
+									? part.error.message
+									: typeof part.error === 'string'
+										? part.error
+										: JSON.stringify(part.error);
+								logger.error('Provider stream error');
+								logger.error(part.error);
+								yield {
+									type: 'error',
+									error: new Error(errorMessage)
+								};
+								break;
+							}
 						}
 					}
 
-					const finalResponse = await result.response;
-					const resolvedToolCalls = await result.toolCalls;
-					const toolCalls = extractToolCalls({ toolCalls: resolvedToolCalls });
+					if (!hasError) {
+						const finalResponse = await result.response;
+						const resolvedToolCalls = await result.toolCalls;
+						const toolCalls = extractToolCalls({ toolCalls: resolvedToolCalls });
 
-					yield {
-						type: 'completed',
-						response: {
-							responseId: finalResponse.id || responseId,
-							content: fullText,
-							toolCalls,
-							finished: true,
-							metadata: {
-								model: modelId,
-								usage: await result.usage
+						yield {
+							type: 'completed',
+							response: {
+								responseId: finalResponse.id || responseId,
+								content: fullText,
+								toolCalls,
+								finished: true,
+								metadata: {
+									model: modelId,
+									usage: await result.usage
+								}
 							}
-						}
-					};
+						};
 
-					logger.debug('Stream completed', {
-						responseId: finalResponse.id || responseId,
-						textLength: fullText.length,
-						toolCallsCount: toolCalls.length
-					});
+						logger.debug('Stream completed', {
+							responseId: finalResponse.id || responseId,
+							textLength: fullText.length,
+							toolCallsCount: toolCalls.length
+						});
+					}
 				} catch (error) {
 					logger.error('Streaming error:', error);
 					yield {
