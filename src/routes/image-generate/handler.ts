@@ -1,4 +1,4 @@
-import type { Response } from 'express';
+import type { RequestHandler, Response } from 'express';
 import asyncHandler from 'express-async-handler';
 import Boom from '@hapi/boom';
 import type { AppConfig, AuthenticatedRequest } from '../../types';
@@ -10,7 +10,7 @@ import { ImageGenerationAPIRequestSchema } from './schema';
  * Image generation handler factory
  * Processes image generation requests through configured providers
  */
-export const imageGenerateHandler = (config: AppConfig) =>
+export const imageGenerateHandler = (config: AppConfig): RequestHandler =>
 	asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
 		const parseResult = ImageGenerationAPIRequestSchema.safeParse(req.body);
 

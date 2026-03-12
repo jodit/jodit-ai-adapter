@@ -1,4 +1,4 @@
-import type { Response } from 'express';
+import type { RequestHandler, Response } from 'express';
 import asyncHandler from 'express-async-handler';
 import Boom from '@hapi/boom';
 import { z } from 'zod';
@@ -148,7 +148,7 @@ async function trackUsage(
  * AI request handler factory
  * Processes AI requests through the configured provider
  */
-export const aiRequestHandler = (config: AppConfig) =>
+export const aiRequestHandler = (config: AppConfig): RequestHandler =>
 	asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
 		// Validate request body
 		const parseResult = RequestSchema.safeParse(req.body);

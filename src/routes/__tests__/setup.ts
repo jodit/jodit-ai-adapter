@@ -21,16 +21,27 @@ export const OPENAI_BASE = 'https://api.openai.com';
 /** UUID that passes the default /^[A-F0-9-]{36}$/i pattern */
 export const TEST_API_KEY = '12345678-1234-1234-1234-123456789abc';
 
-export function authHeader() {
+export function authHeader(): { Authorization: string } {
 	return { Authorization: `Bearer ${TEST_API_KEY}` };
 }
+
+export type ResponseFixture = {
+	readonly request: {
+		readonly url: string;
+		readonly method: string;
+	}
+	readonly response: {
+		readonly status: number;
+		readonly body: Record<string, unknown>;
+	};
+};
 
 /**
  * Load a fixture JSON file.
  * @param provider - provider subfolder (e.g. 'openai')
  * @param name     - fixture name without extension (e.g. 'text-generation')
  */
-export function loadFixture(provider: string, name: string) {
+export function loadFixture(provider: string, name: string): ResponseFixture {
 	const filePath = path.join(FIXTURES_DIR, provider, `${name}.json`);
 	return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 }
@@ -39,7 +50,10 @@ export function loadFixture(provider: string, name: string) {
  * Set up a nock interceptor from a fixture file.
  * Returns the nock scope so callers can assert `scope.isDone()`.
  */
-export function mockFixture(provider: string, name: string) {
+export function mockFixture(
+	provider: string,
+	name: string
+): { scope: nock.Scope; fixture: ResponseFixture } {
 	const fixture = loadFixture(provider, name);
 	const url = new URL(fixture.request.url);
 	const scope = nock(url.origin)
@@ -61,7 +75,10 @@ export function loadStreamingFixture(provider: string, name: string): string[] {
  * Set up a nock interceptor that streams SSE events chunk-by-chunk
  * from a captured .txt fixture.
  */
-export function mockStreamingFixture(provider: string, name: string) {
+export function mockStreamingFixture(
+	provider: string,
+	name: string
+): { scope: nock.Scope; events: string[] } {
 	const events = loadStreamingFixture(provider, name);
 
 	const scope = nock(OPENAI_BASE)
@@ -72,7 +89,7 @@ export function mockStreamingFixture(provider: string, name: string) {
 				const stream = new PassThrough();
 
 				let i = 0;
-				const push = () => {
+				const push = (): void => {
 					if (i < events.length) {
 						stream.write(events[i] + '\n\n');
 						i++;
