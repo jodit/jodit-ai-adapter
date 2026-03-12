@@ -1,7 +1,7 @@
 import type { RequestHandler, Response } from 'express';
 import asyncHandler from 'express-async-handler';
 import Boom from '@hapi/boom';
-import type { AppConfig, AuthenticatedRequest } from '../../types';
+import type { AppConfig, AuthenticatedRequest, ProviderUsage } from '../../types';
 import { AdapterFactory } from '../../adapters/adapter-factory';
 import { logger } from '../../helpers/logger';
 import { ImageGenerationAPIRequestSchema } from './schema';
@@ -72,29 +72,27 @@ export const imageGenerateHandler = (config: AppConfig): RequestHandler =>
 
 			// Track usage if callback is configured
 			if (config.onUsage && req.apiKey) {
-				const usage = result.metadata?.usage as {
-					inputTokens?: number;
-					outputTokens?: number;
-					totalTokens?: number;
-				} | undefined;
+				const usage = (result.metadata?.usage ?? {}) as ProviderUsage;
+				const model = (result.metadata?.model || 'unknown') as string;
 
 				try {
 					await config.onUsage({
 						userId: req.userId || 'anonymous',
 						apiKey: req.apiKey,
 						provider,
-						model: result.metadata?.model || 'unknown',
+						model,
 						responseId: `img-${Date.now()}`,
-						promptTokens: usage?.inputTokens,
-						completionTokens: usage?.outputTokens,
-						totalTokens: usage?.totalTokens,
+						promptTokens: usage.inputTokens ?? usage.promptTokens,
+						completionTokens: usage.outputTokens ?? usage.completionTokens,
+						totalTokens: usage.totalTokens,
 						timestamp: Date.now(),
 						duration,
 						metadata: {
 							imageCount: result.images.length,
 							size: imageRequest.size,
 							prompt: imageRequest.prompt
-						}
+						},
+						credits: adapter.calculateCredits(model, usage)
 					});
 				} catch (usageError) {
 					logger.error('Failed to track usage:', usageError);

@@ -1,13 +1,16 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateImage, type LanguageModel } from 'ai';
 import type {
+	CreditsCost,
 	IAIRequestContext,
 	IImageGenerationRequest,
-	IImageGenerationResponse
-} from '../types';
-import { BaseAdapter, type BaseAdapterConfig } from './base-adapter';
-import { logger } from '../helpers/logger';
-import { createFetch } from '../helpers/proxy';
+	IImageGenerationResponse,
+	ProviderUsage
+} from '../../types';
+import { BaseAdapter, type BaseAdapterConfig } from '../base-adapter';
+import { logger } from '../../helpers/logger';
+import { createFetch } from '../../helpers/proxy';
+import { calculateCredits } from './credit';
 
 /**
  * OpenAI adapter using Vercel AI SDK
@@ -15,6 +18,10 @@ import { createFetch } from '../helpers/proxy';
 export class OpenAIAdapter extends BaseAdapter {
 	private provider: ReturnType<typeof createOpenAI>;
 	private customFetch?: typeof fetch;
+
+	calculateCredits(model: string, usage: ProviderUsage): CreditsCost {
+		return calculateCredits(model, usage);
+	}
 
 	constructor(config: BaseAdapterConfig) {
 		super(config);

@@ -22,6 +22,21 @@ export interface ProviderUsage {
 	totalTokens?: number;
 	inputTokens?: number;
 	outputTokens?: number;
+	cachedInputTokens?: number;
+}
+
+export interface ModelPricing {
+	input: number; // $ per 1M tokens
+	cachedInput: number; // $ per 1M tokens
+	output: number; // $ per 1M tokens
+};
+
+export interface CreditsCost {
+	credits: number;
+	usdCost: number;
+	inputTokens: number;
+	outputTokens: number;
+	cachedInputTokens: number;
 }
 
 /**

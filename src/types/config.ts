@@ -2,6 +2,7 @@
  * Configuration types for the adapter service
  */
 import type { Request } from 'express';
+import { CreditsCost } from './express';
 
 /**
  * Authentication callback
@@ -49,6 +50,9 @@ export interface UsageStats {
 
 	/** Additional metadata */
 	metadata?: Record<string, unknown>;
+
+	/** Calculated credits cost */
+	credits: CreditsCost;
 }
 
 /**

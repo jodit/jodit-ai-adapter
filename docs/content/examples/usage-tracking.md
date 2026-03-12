@@ -52,8 +52,9 @@ await start({
       `INSERT INTO ai_usage
        (user_id, provider, model, response_id,
         prompt_tokens, completion_tokens, total_tokens,
+        credits, usd_cost,
         duration, timestamp, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         stats.userId,
         stats.provider,
@@ -62,6 +63,8 @@ await start({
         stats.promptTokens || 0,
         stats.completionTokens || 0,
         stats.totalTokens || 0,
+        stats.credits.credits,
+        stats.credits.usdCost,
         stats.duration,
         new Date(stats.timestamp),
         JSON.stringify(stats.metadata)
@@ -101,6 +104,8 @@ await start({
         completion: stats.completionTokens,
         total: stats.totalTokens
       },
+      credits: stats.credits.credits,
+      usdCost: stats.credits.usdCost,
       duration: stats.duration,
       timestamp: new Date(stats.timestamp),
       metadata: stats.metadata
@@ -109,59 +114,35 @@ await start({
 });
 ```
 
-## Cost Calculation
+## Credits (Built-in Cost Calculation)
+
+Every `onUsage` callback receives a `credits` field with a pre-calculated cost breakdown.
+No need to maintain your own pricing tables — the adapter does it automatically.
+
+See [Credits](../credits.md) for the full reference.
 
 ```typescript
 import { start } from 'jodit-ai-adapter';
 
-// Define pricing per model (per 1M tokens)
-const PRICING = {
-  'gpt-5.2': {
-    input: 2.50,  // $2.50 per 1M input tokens
-    output: 10.00  // $10.00 per 1M output tokens
-  },
-  'gpt-5.2-mini': {
-    input: 0.15,
-    output: 0.60
-  }
-};
-
-function calculateCost(
-  model: string,
-  promptTokens: number,
-  completionTokens: number
-): number {
-  const pricing = PRICING[model as keyof typeof PRICING];
-  if (!pricing) return 0;
-
-  const inputCost = (promptTokens / 1_000_000) * pricing.input;
-  const outputCost = (completionTokens / 1_000_000) * pricing.output;
-
-  return inputCost + outputCost;
-}
-
 await start({
   port: 8082,
   onUsage: async (stats) => {
-    const cost = calculateCost(
-      stats.model,
-      stats.promptTokens || 0,
-      stats.completionTokens || 0
-    );
+    const { credits } = stats;
 
     await db.query(
-      `INSERT INTO ai_usage (user_id, model, tokens, cost, timestamp)
-       VALUES ($1, $2, $3, $4, $5)`,
+      `INSERT INTO ai_usage (user_id, model, tokens, credits, usd_cost, timestamp)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         stats.userId,
         stats.model,
         stats.totalTokens,
-        cost,
+        credits.credits,
+        credits.usdCost,
         new Date(stats.timestamp)
       ]
     );
 
-    console.log(`Cost: $${cost.toFixed(4)} for ${stats.totalTokens} tokens`);
+    console.log(`Cost: ${credits.credits} credits ($${credits.usdCost.toFixed(6)}) for ${stats.totalTokens} tokens`);
   }
 });
 ```
@@ -223,32 +204,27 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 await start({
   port: 8082,
   onUsage: async (stats) => {
-    const cost = calculateCost(
-      stats.model,
-      stats.promptTokens || 0,
-      stats.completionTokens || 0
-    );
+    const { credits } = stats;
 
-    if (cost > 0) {
-      // Get user's Stripe customer ID
+    if (credits.credits > 0) {
       const user = await db.users.findById(stats.userId);
 
       if (user.stripeCustomerId) {
-        // Create usage record for metered billing
+        // Report credits as metered usage
         await stripe.subscriptionItems.createUsageRecord(
           user.stripeSubscriptionItemId,
           {
-            quantity: Math.ceil(cost * 100), // Convert to cents
+            quantity: credits.credits,
             timestamp: Math.floor(stats.timestamp / 1000)
           }
         );
       }
     }
 
-    // Save to database
     await db.usage.create({
       userId: stats.userId,
-      cost,
+      credits: credits.credits,
+      usdCost: credits.usdCost,
       tokens: stats.totalTokens,
       timestamp: new Date(stats.timestamp)
     });
@@ -411,21 +387,24 @@ CREATE TABLE ai_usage (
   prompt_tokens INTEGER,
   completion_tokens INTEGER,
   total_tokens INTEGER,
+  credits INTEGER NOT NULL DEFAULT 0,
+  usd_cost DECIMAL(12, 8) NOT NULL DEFAULT 0,
   duration INTEGER,
-  cost DECIMAL(10, 6),
   timestamp TIMESTAMP NOT NULL,
   metadata JSONB,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_user_timestamp (user_id, timestamp),
-  INDEX idx_provider_model (provider, model)
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Query daily usage by user
+CREATE INDEX idx_user_timestamp ON ai_usage (user_id, timestamp);
+CREATE INDEX idx_provider_model ON ai_usage (provider, model);
+
+-- Query daily usage and cost by user
 SELECT
   user_id,
   DATE(timestamp) as date,
   SUM(total_tokens) as total_tokens,
-  SUM(cost) as total_cost,
+  SUM(credits) as total_credits,
+  SUM(usd_cost) as total_usd_cost,
   COUNT(*) as request_count
 FROM ai_usage
 WHERE timestamp >= NOW() - INTERVAL '30 days'

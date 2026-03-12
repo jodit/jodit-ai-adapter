@@ -68,6 +68,7 @@ nav:
   - API Reference: api-reference.md
   - Architecture: ARCHITECTURE.md
   - Rate Limiting: rate-limiting.md
+  - Credits: credits.md
   - Examples:
       - Client Integration: examples/client-integration.md
       - Usage Tracking: examples/usage-tracking.md

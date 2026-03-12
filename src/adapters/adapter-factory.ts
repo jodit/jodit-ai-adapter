@@ -1,6 +1,6 @@
 import type { AIProvider, ProviderConfig } from '../types';
 import { BaseAdapter, type BaseAdapterConfig } from './base-adapter';
-import { OpenAIAdapter } from './openai-adapter';
+import { OpenAIAdapter } from './openai/openai-adapter';
 import { logger } from '../helpers/logger';
 
 /**

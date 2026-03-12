@@ -5,19 +5,19 @@ import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { OpenAIAdapter } from './openai-adapter.js';
-import type { IAIRequestContext, AIStreamEvent } from '../types/index.js';
+import type { IAIRequestContext, AIStreamEvent } from '../../types/index.js';
 import type { JSONSchema7TypeName } from 'json-schema';
-import { ResponseFixture } from '../routes/__tests__/setup.js';
+import { ResponseFixture } from '../../routes/__tests__/setup.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function loadFixture(name: string): ResponseFixture {
-	const filePath = path.join(__dirname, '__fixtures__', 'openai', `${name}.json`);
+	const filePath = path.join(__dirname, '__fixtures__', `${name}.json`);
 	return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 }
 
 function mockStreamingFixture(name: string): { scope: nock.Scope; events: string[] } {
-	const filePath = path.join(__dirname, '__fixtures__', 'openai', `${name}.txt`);
+	const filePath = path.join(__dirname, '__fixtures__', `${name}.txt`);
 	const raw = fs.readFileSync(filePath, 'utf-8');
 	const events = raw.split('\n\n').filter(Boolean);
 

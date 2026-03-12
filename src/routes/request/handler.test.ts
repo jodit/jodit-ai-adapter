@@ -461,6 +461,17 @@ describe('POST /ai/request', () => {
 					totalTokens: 50
 				})
 			);
+
+			// Verify credits calculation for gpt-4.1-nano: input=$0.10/1M, output=$0.40/1M
+			// 45 input tokens * $0.10/1M + 5 output tokens * $0.40/1M = $0.0000065
+			// credits = ceil($0.0000065 * 1000) = 1
+			expect(stats.credits).toEqual({
+				credits: 1,
+				usdCost: expect.closeTo(0.0000065, 10),
+				inputTokens: 45,
+				outputTokens: 5,
+				cachedInputTokens: 0
+			});
 		});
 
 		it('should call onUsage after streaming request', async () => {
@@ -515,6 +526,14 @@ describe('POST /ai/request', () => {
 					totalTokens: 50
 				})
 			);
+
+			expect(stats.credits).toEqual({
+				credits: 1,
+				usdCost: expect.closeTo(0.0000065, 10),
+				inputTokens: 45,
+				outputTokens: 5,
+				cachedInputTokens: 0
+			});
 		});
 
 		it('should not fail request when onUsage throws', async () => {

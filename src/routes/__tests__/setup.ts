@@ -8,13 +8,7 @@ import type { AppConfig } from '../../types/index.js';
 import { createApp } from '../../app.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const FIXTURES_DIR = path.join(
-	__dirname,
-	'..',
-	'..',
-	'adapters',
-	'__fixtures__'
-);
+const ADAPTERS_DIR = path.join(__dirname, '..', '..', 'adapters');
 
 export const OPENAI_BASE = 'https://api.openai.com';
 
@@ -29,7 +23,7 @@ export type ResponseFixture = {
 	readonly request: {
 		readonly url: string;
 		readonly method: string;
-	}
+	};
 	readonly response: {
 		readonly status: number;
 		readonly body: Record<string, unknown>;
@@ -42,7 +36,12 @@ export type ResponseFixture = {
  * @param name     - fixture name without extension (e.g. 'text-generation')
  */
 export function loadFixture(provider: string, name: string): ResponseFixture {
-	const filePath = path.join(FIXTURES_DIR, provider, `${name}.json`);
+	const filePath = path.join(
+		ADAPTERS_DIR,
+		provider,
+		'__fixtures__',
+		`${name}.json`
+	);
 	return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
 }
 
@@ -66,7 +65,12 @@ export function mockFixture(
  * Load a raw SSE fixture (.txt) and return the text split into event blocks.
  */
 export function loadStreamingFixture(provider: string, name: string): string[] {
-	const filePath = path.join(FIXTURES_DIR, provider, `${name}.txt`);
+	const filePath = path.join(
+		ADAPTERS_DIR,
+		provider,
+		'__fixtures__',
+		`${name}.txt`
+	);
 	const raw = fs.readFileSync(filePath, 'utf-8');
 	return raw.split('\n\n').filter(Boolean);
 }

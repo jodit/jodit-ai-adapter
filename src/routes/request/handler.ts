@@ -12,6 +12,7 @@ import type {
 } from '../../types';
 import { AdapterFactory } from '../../adapters/adapter-factory';
 import { logger } from '../../helpers/logger';
+import type { BaseAdapter } from '../../adapters/base-adapter';
 
 /**
  * Zod schemas for validation
@@ -99,6 +100,7 @@ function adaptContext(
  * Track usage statistics
  */
 async function trackUsage(
+	adapter: BaseAdapter,
 	config: AppConfig,
 	params: {
 		userId: string;
@@ -113,21 +115,24 @@ async function trackUsage(
 
 	const usage = params.response.metadata?.usage as ProviderUsage | undefined;
 
+	const model = (params.context.conversationOptions?.model ||
+		params.response.metadata?.model ||
+		'unknown') as string;
+
 	const stats: UsageStats = {
 		userId: params.userId,
 		apiKey: params.apiKey,
 		provider: params.provider,
-		model:
-			(params.context.conversationOptions?.model ||
-			params.response.metadata?.model ||
-			'unknown') as string,
+		model,
+
 		responseId: params.response.responseId,
 		promptTokens: usage?.promptTokens || usage?.inputTokens,
 		completionTokens: usage?.completionTokens || usage?.outputTokens,
 		totalTokens: usage?.totalTokens,
 		timestamp: params.startTime,
 		duration,
-		metadata: params.response.metadata
+		metadata: params.response.metadata,
+		credits: adapter.calculateCredits(model, usage || {})
 	};
 
 	logger.debug('Tracking usage', {
@@ -252,7 +257,7 @@ export const aiRequestHandler = (config: AppConfig): RequestHandler =>
 
 				// Track usage after stream completes
 				if (finalResponse) {
-					await trackUsage(config, {
+					await trackUsage(adapter, config, {
 						userId: req.userId || 'anonymous',
 						apiKey: req.apiKey || '',
 						provider,
@@ -271,7 +276,7 @@ export const aiRequestHandler = (config: AppConfig): RequestHandler =>
 				});
 
 				// Track usage for non-streaming response
-				await trackUsage(config, {
+				await trackUsage(adapter, config, {
 					userId: req.userId || 'anonymous',
 					apiKey: req.apiKey || '',
 					provider,

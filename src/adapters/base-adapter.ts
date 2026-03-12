@@ -21,7 +21,9 @@ import type {
 	IToolCall,
 	IImageGenerationRequest,
 	IImageGenerationResponse,
-	StreamTextParams
+	StreamTextParams,
+	ProviderUsage,
+	CreditsCost
 } from '../types';
 import { logger } from '../helpers/logger';
 
@@ -51,6 +53,8 @@ export abstract class BaseAdapter {
 		}
 		this.config = config;
 	}
+
+	abstract calculateCredits(model: string, usage: ProviderUsage): CreditsCost;
 
 	/**
 	 * Main entry point for handling AI requests
