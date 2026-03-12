@@ -92,6 +92,9 @@ export interface ProviderConfig {
 
 	/** Additional provider-specific options */
 	options?: Record<string, unknown>;
+
+	/** Maximum output tokens for generation (optional) */
+	maxOutputTokens?: number;
 }
 
 /**

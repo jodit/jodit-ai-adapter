@@ -45,7 +45,8 @@ export class AdapterFactory {
 			apiEndpoint: config.apiEndpoint,
 			defaultModel: config.defaultModel,
 			httpProxy: config.httpProxy,
-			options: config.options
+			options: config.options,
+			maxOutputTokens: config.maxOutputTokens
 		});
 	}
 

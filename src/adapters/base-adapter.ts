@@ -27,6 +27,8 @@ import type {
 } from '../types';
 import { logger } from '../helpers/logger';
 
+const DEFAULT_MAX_OUTPUT_TOKENS = 2048;
+
 type GenerateTextResult = { toolCalls: Array<{ toolCallId: string; toolName: string; input: unknown }> };
 
 /**
@@ -38,6 +40,7 @@ export interface BaseAdapterConfig {
 	defaultModel?: string;
 	httpProxy?: string;
 	options?: Record<string, unknown>;
+	maxOutputTokens?: number;
 }
 
 /**
@@ -95,7 +98,7 @@ export abstract class BaseAdapter {
 			model: { modelId: model },
 			messages,
 			temperature: context.conversationOptions?.temperature,
-			maxOutputTokens: 4000,
+			maxOutputTokens: this.config.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS,
 			abortSignal: signal,
 			...(Object.keys(tools).length > 0 ? { tools } : {})
 		};
