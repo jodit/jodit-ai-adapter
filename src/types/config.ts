@@ -1,6 +1,7 @@
 /**
  * Configuration types for the adapter service
  */
+import type { Request } from 'express';
 
 /**
  * Authentication callback
@@ -154,6 +155,9 @@ export interface AppConfig {
 
 	/** Allowed referer patterns */
 	allowedReferers?: RegExp[];
+
+	/** External referer validation callback. If set, implies requireReferer: true */
+	checkReferer?: (referer: string, req: Request) => boolean | Promise<boolean>;
 
 	/** Route prefix (default: '/ai') */
 	routePrefix?: string;

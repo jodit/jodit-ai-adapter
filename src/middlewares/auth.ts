@@ -119,12 +119,15 @@ export function authMiddleware(config: AppConfig) {
 
 			// Extract and validate referer
 			const referer = extractReferer(req);
-			if (config.requireReferer && !referer) {
+			const requireReferer =
+				config.requireReferer || !!config.checkReferer;
+
+			if (requireReferer && !referer) {
 				throw Boom.forbidden('Referer header is required');
 			}
 
 			if (
-				config.requireReferer &&
+				requireReferer &&
 				!validateReferer(referer, config.allowedReferers)
 			) {
 				logger.warn('Referer not allowed', {
@@ -132,6 +135,17 @@ export function authMiddleware(config: AppConfig) {
 					referer
 				});
 				throw Boom.forbidden('Referer not allowed');
+			}
+
+			if (config.checkReferer && referer) {
+				const isValid = await config.checkReferer(referer, req);
+				if (!isValid) {
+					logger.warn('Referer rejected by checkReferer', {
+						ip: req.ip,
+						referer
+					});
+					throw Boom.forbidden('Referer not allowed');
+				}
 			}
 
 			// Call custom authentication callback if provided
@@ -167,11 +181,13 @@ export function authMiddleware(config: AppConfig) {
 		} catch (error) {
 			if (Boom.isBoom(error)) {
 				res.status(error.output.statusCode).json({
+					success: false,
 					error: error.output.payload.message
 				});
 			} else {
 				logger.error('Authentication error:', error);
 				res.status(500).json({
+					success: false,
 					error: 'Internal server error'
 				});
 			}

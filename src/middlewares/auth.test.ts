@@ -260,6 +260,165 @@ describe('authMiddleware', () => {
 			expect(mockNext).not.toHaveBeenCalled();
 		});
 
+		it('should require referer when checkReferer is set', async () => {
+			const configWithCheckReferer = {
+				...mockConfig,
+				requireReferer: false,
+				checkReferer: jest.fn().mockReturnValue(true) as unknown as AppConfig['checkReferer']
+			};
+
+			mockReq.headers = {
+				authorization: 'Bearer ABCDEF01-2345-6789-ABCD-EF0123456789'
+			};
+
+			const middleware = authMiddleware(configWithCheckReferer);
+			await middleware(
+				mockReq as Request,
+				mockRes as Response,
+				mockNext
+			);
+
+			expect(mockRes.status).toHaveBeenCalledWith(403);
+			expect(mockRes.json).toHaveBeenCalledWith({
+				success: false,
+				error: 'Referer header is required'
+			});
+			expect(mockNext).not.toHaveBeenCalled();
+		});
+
+		it('should call checkReferer and accept when it returns true', async () => {
+			const checkReferer = jest.fn().mockReturnValue(true);
+			const configWithCheckReferer = {
+				...mockConfig,
+				requireReferer: false,
+				checkReferer: checkReferer as unknown as AppConfig['checkReferer']
+			};
+
+			mockReq.headers = {
+				authorization: 'Bearer ABCDEF01-2345-6789-ABCD-EF0123456789',
+				referer: 'https://example.com/page'
+			};
+
+			const middleware = authMiddleware(configWithCheckReferer);
+			await middleware(
+				mockReq as Request,
+				mockRes as Response,
+				mockNext
+			);
+
+			expect(checkReferer).toHaveBeenCalledWith(
+				'https://example.com/page',
+				mockReq
+			);
+			expect(mockNext).toHaveBeenCalled();
+		});
+
+		it('should reject when checkReferer returns false', async () => {
+			const checkReferer = jest.fn().mockReturnValue(false);
+			const configWithCheckReferer = {
+				...mockConfig,
+				requireReferer: false,
+				checkReferer: checkReferer as unknown as AppConfig['checkReferer']
+			};
+
+			mockReq.headers = {
+				authorization: 'Bearer ABCDEF01-2345-6789-ABCD-EF0123456789',
+				referer: 'https://evil.com/page'
+			};
+
+			const middleware = authMiddleware(configWithCheckReferer);
+			await middleware(
+				mockReq as Request,
+				mockRes as Response,
+				mockNext
+			);
+
+			expect(mockRes.status).toHaveBeenCalledWith(403);
+			expect(mockRes.json).toHaveBeenCalledWith({
+				success: false,
+				error: 'Referer not allowed'
+			});
+			expect(mockNext).not.toHaveBeenCalled();
+		});
+
+		it('should reject when checkReferer returns async false', async () => {
+			const checkReferer = jest.fn().mockResolvedValue(false);
+			const configWithCheckReferer = {
+				...mockConfig,
+				requireReferer: false,
+				checkReferer: checkReferer as unknown as AppConfig['checkReferer']
+			};
+
+			mockReq.headers = {
+				authorization: 'Bearer ABCDEF01-2345-6789-ABCD-EF0123456789',
+				referer: 'https://evil.com/page'
+			};
+
+			const middleware = authMiddleware(configWithCheckReferer);
+			await middleware(
+				mockReq as Request,
+				mockRes as Response,
+				mockNext
+			);
+
+			expect(mockRes.status).toHaveBeenCalledWith(403);
+			expect(mockNext).not.toHaveBeenCalled();
+		});
+
+		it('should combine allowedReferers and checkReferer (reject on pattern)', async () => {
+			const checkReferer = jest.fn().mockReturnValue(true);
+			const configWithBoth = {
+				...mockConfig,
+				requireReferer: true,
+				allowedReferers: [/^https:\/\/example\.com/],
+				checkReferer: checkReferer as unknown as AppConfig['checkReferer']
+			};
+
+			mockReq.headers = {
+				authorization: 'Bearer ABCDEF01-2345-6789-ABCD-EF0123456789',
+				referer: 'https://evil.com/page'
+			};
+
+			const middleware = authMiddleware(configWithBoth);
+			await middleware(
+				mockReq as Request,
+				mockRes as Response,
+				mockNext
+			);
+
+			// Should be rejected by allowedReferers before checkReferer is called
+			expect(checkReferer).not.toHaveBeenCalled();
+			expect(mockRes.status).toHaveBeenCalledWith(403);
+			expect(mockNext).not.toHaveBeenCalled();
+		});
+
+		it('should combine allowedReferers and checkReferer (reject on callback)', async () => {
+			const checkReferer = jest.fn().mockReturnValue(false);
+			const configWithBoth = {
+				...mockConfig,
+				requireReferer: true,
+				allowedReferers: [/^https:\/\/example\.com/],
+				checkReferer: checkReferer as unknown as AppConfig['checkReferer']
+			};
+
+			mockReq.headers = {
+				authorization: 'Bearer ABCDEF01-2345-6789-ABCD-EF0123456789',
+				referer: 'https://example.com/page'
+			};
+
+			const middleware = authMiddleware(configWithBoth);
+			await middleware(
+				mockReq as Request,
+				mockRes as Response,
+				mockNext
+			);
+
+			// Passes allowedReferers but rejected by checkReferer
+			expect(checkReferer).toHaveBeenCalled();
+			expect(mockRes.status).toHaveBeenCalledWith(403);
+			expect(mockNext).not.toHaveBeenCalled();
+		});
+
 		it('should accept origin header as referer', async () => {
 			const configWithReferer = {
 				...mockConfig,
