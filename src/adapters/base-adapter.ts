@@ -27,7 +27,7 @@ import type {
 } from '../types';
 import { logger } from '../helpers/logger';
 
-const DEFAULT_MAX_OUTPUT_TOKENS = 2048;
+const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
 
 type GenerateTextResult = { toolCalls: Array<{ toolCallId: string; toolName: string; input: unknown }> };
 
