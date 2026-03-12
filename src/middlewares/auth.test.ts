@@ -41,11 +41,7 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(mockConfig);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockNext).toHaveBeenCalled();
 			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
@@ -59,11 +55,7 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(mockConfig);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockNext).toHaveBeenCalled();
 			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
@@ -77,11 +69,7 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(mockConfig);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockNext).toHaveBeenCalled();
 			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
@@ -98,11 +86,7 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(mockConfig);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockNext).toHaveBeenCalled();
 			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
@@ -119,11 +103,7 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(mockConfig);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockNext).toHaveBeenCalled();
 			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
@@ -133,14 +113,11 @@ describe('authMiddleware', () => {
 
 		it('should reject request without API key', async () => {
 			const middleware = authMiddleware(mockConfig);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockRes.status).toHaveBeenCalledWith(401);
 			expect(mockRes.json).toHaveBeenCalledWith({
+				success: false,
 				error: 'API key is required'
 			});
 			expect(mockNext).not.toHaveBeenCalled();
@@ -152,14 +129,11 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(mockConfig);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockRes.status).toHaveBeenCalledWith(401);
 			expect(mockRes.json).toHaveBeenCalledWith({
+				success: false,
 				error: 'Invalid API key format'
 			});
 			expect(mockNext).not.toHaveBeenCalled();
@@ -176,14 +150,12 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(customConfig);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockNext).toHaveBeenCalled();
-			expect((mockReq as AuthenticatedRequest).apiKey).toBe('test-key-12345');
+			expect((mockReq as AuthenticatedRequest).apiKey).toBe(
+				'test-key-12345'
+			);
 		});
 	});
 
@@ -199,14 +171,11 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(configWithReferer);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockRes.status).toHaveBeenCalledWith(403);
 			expect(mockRes.json).toHaveBeenCalledWith({
+				success: false,
 				error: 'Referer header is required'
 			});
 			expect(mockNext).not.toHaveBeenCalled();
@@ -225,11 +194,7 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(configWithReferer);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockNext).toHaveBeenCalled();
 		});
@@ -247,14 +212,11 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(configWithReferer);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockRes.status).toHaveBeenCalledWith(403);
 			expect(mockRes.json).toHaveBeenCalledWith({
+				success: false,
 				error: 'Referer not allowed'
 			});
 			expect(mockNext).not.toHaveBeenCalled();
@@ -264,7 +226,11 @@ describe('authMiddleware', () => {
 			const configWithCheckReferer = {
 				...mockConfig,
 				requireReferer: false,
-				checkReferer: jest.fn().mockReturnValue(true) as unknown as AppConfig['checkReferer']
+				checkReferer: jest
+					.fn()
+					.mockReturnValue(
+						true
+					) as unknown as AppConfig['checkReferer']
 			};
 
 			mockReq.headers = {
@@ -272,11 +238,7 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(configWithCheckReferer);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockRes.status).toHaveBeenCalledWith(403);
 			expect(mockRes.json).toHaveBeenCalledWith({
@@ -291,7 +253,8 @@ describe('authMiddleware', () => {
 			const configWithCheckReferer = {
 				...mockConfig,
 				requireReferer: false,
-				checkReferer: checkReferer as unknown as AppConfig['checkReferer']
+				checkReferer:
+					checkReferer as unknown as AppConfig['checkReferer']
 			};
 
 			mockReq.headers = {
@@ -300,11 +263,7 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(configWithCheckReferer);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(checkReferer).toHaveBeenCalledWith(
 				'https://example.com/page',
@@ -318,7 +277,8 @@ describe('authMiddleware', () => {
 			const configWithCheckReferer = {
 				...mockConfig,
 				requireReferer: false,
-				checkReferer: checkReferer as unknown as AppConfig['checkReferer']
+				checkReferer:
+					checkReferer as unknown as AppConfig['checkReferer']
 			};
 
 			mockReq.headers = {
@@ -327,11 +287,7 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(configWithCheckReferer);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockRes.status).toHaveBeenCalledWith(403);
 			expect(mockRes.json).toHaveBeenCalledWith({
@@ -342,11 +298,14 @@ describe('authMiddleware', () => {
 		});
 
 		it('should reject when checkReferer returns async false', async () => {
-			const checkReferer = jest.fn().mockResolvedValue(false);
+			const checkReferer = jest
+				.fn<() => Promise<boolean>>()
+				.mockResolvedValue(false);
 			const configWithCheckReferer = {
 				...mockConfig,
 				requireReferer: false,
-				checkReferer: checkReferer as unknown as AppConfig['checkReferer']
+				checkReferer:
+					checkReferer as unknown as AppConfig['checkReferer']
 			};
 
 			mockReq.headers = {
@@ -355,11 +314,7 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(configWithCheckReferer);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockRes.status).toHaveBeenCalledWith(403);
 			expect(mockNext).not.toHaveBeenCalled();
@@ -371,7 +326,8 @@ describe('authMiddleware', () => {
 				...mockConfig,
 				requireReferer: true,
 				allowedReferers: [/^https:\/\/example\.com/],
-				checkReferer: checkReferer as unknown as AppConfig['checkReferer']
+				checkReferer:
+					checkReferer as unknown as AppConfig['checkReferer']
 			};
 
 			mockReq.headers = {
@@ -380,11 +336,7 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(configWithBoth);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			// Should be rejected by allowedReferers before checkReferer is called
 			expect(checkReferer).not.toHaveBeenCalled();
@@ -398,7 +350,8 @@ describe('authMiddleware', () => {
 				...mockConfig,
 				requireReferer: true,
 				allowedReferers: [/^https:\/\/example\.com/],
-				checkReferer: checkReferer as unknown as AppConfig['checkReferer']
+				checkReferer:
+					checkReferer as unknown as AppConfig['checkReferer']
 			};
 
 			mockReq.headers = {
@@ -407,11 +360,7 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(configWithBoth);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			// Passes allowedReferers but rejected by checkReferer
 			expect(checkReferer).toHaveBeenCalled();
@@ -432,11 +381,7 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(configWithReferer);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockNext).toHaveBeenCalled();
 		});
@@ -444,7 +389,9 @@ describe('authMiddleware', () => {
 
 	describe('Custom authentication callback', () => {
 		it('should call custom auth callback and accept valid user', async () => {
-			const mockAuthCallback = jest.fn().mockResolvedValue('user-123' as never);
+			const mockAuthCallback = jest
+				.fn()
+				.mockResolvedValue('user-123' as never);
 
 			const configWithAuth: AppConfig = {
 				...mockConfig,
@@ -456,11 +403,7 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(configWithAuth);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockAuthCallback).toHaveBeenCalledWith(
 				'ABCDEF01-2345-6789-ABCD-EF0123456789',
@@ -473,9 +416,7 @@ describe('authMiddleware', () => {
 
 		it('should reject when custom auth callback returns null', async () => {
 			const mockAuthCallback = jest
-				.fn<
-					() => Promise<string | null>
-				>()
+				.fn<() => Promise<string | null>>()
 				.mockResolvedValue(null);
 
 			const configWithAuth: AppConfig = {
@@ -488,21 +429,20 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(configWithAuth);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockRes.status).toHaveBeenCalledWith(401);
 			expect(mockRes.json).toHaveBeenCalledWith({
+				success: false,
 				error: 'Authentication failed'
 			});
 			expect(mockNext).not.toHaveBeenCalled();
 		});
 
 		it('should handle errors from custom auth callback', async () => {
-			const mockAuthCallback = jest.fn().mockRejectedValue(new Error('Database error') as never);
+			const mockAuthCallback = jest
+				.fn()
+				.mockRejectedValue(new Error('Database error') as never);
 
 			const configWithAuth: AppConfig = {
 				...mockConfig,
@@ -514,11 +454,7 @@ describe('authMiddleware', () => {
 			};
 
 			const middleware = authMiddleware(configWithAuth);
-			await middleware(
-				mockReq as Request,
-				mockRes as Response,
-				mockNext
-			);
+			await middleware(mockReq as Request, mockRes as Response, mockNext);
 
 			expect(mockRes.status).toHaveBeenCalledWith(500);
 			expect(mockNext).not.toHaveBeenCalled();
