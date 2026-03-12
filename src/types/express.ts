@@ -17,11 +17,11 @@ export interface AuthenticatedRequest extends Request {
  * Usage data from AI provider
  */
 export interface ProviderUsage {
-	prompt_tokens?: number;
-	completion_tokens?: number;
-	total_tokens?: number;
-	input_tokens?: number;
-	output_tokens?: number;
+	promptTokens?: number;
+	completionTokens?: number;
+	totalTokens?: number;
+	inputTokens?: number;
+	outputTokens?: number;
 }
 
 /**

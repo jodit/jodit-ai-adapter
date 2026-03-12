@@ -109,10 +109,6 @@ async function trackUsage(
 		startTime: number;
 	}
 ): Promise<void> {
-	if (!config.onUsage) {
-		return;
-	}
-
 	const duration = Date.now() - params.startTime;
 
 	const usage = params.response.metadata?.usage as ProviderUsage | undefined;
@@ -121,11 +117,14 @@ async function trackUsage(
 		userId: params.userId,
 		apiKey: params.apiKey,
 		provider: params.provider,
-		model: params.context.conversationOptions?.model || 'unknown',
+		model:
+			(params.context.conversationOptions?.model ||
+			params.response.metadata?.model ||
+			'unknown') as string,
 		responseId: params.response.responseId,
-		promptTokens: usage?.prompt_tokens || usage?.input_tokens,
-		completionTokens: usage?.completion_tokens || usage?.output_tokens,
-		totalTokens: usage?.total_tokens,
+		promptTokens: usage?.promptTokens || usage?.inputTokens,
+		completionTokens: usage?.completionTokens || usage?.outputTokens,
+		totalTokens: usage?.totalTokens,
 		timestamp: params.startTime,
 		duration,
 		metadata: params.response.metadata
@@ -137,6 +136,10 @@ async function trackUsage(
 		model: stats.model,
 		totalTokens: stats.totalTokens
 	});
+
+	if (!config.onUsage) {
+		return;
+	}
 
 	await config.onUsage(stats);
 }
@@ -166,7 +169,9 @@ export const aiRequestHandler = (config: AppConfig) =>
 
 		// Check if provider is supported and enabled
 		if (!AdapterFactory.isProviderSupported(provider, providerConfig)) {
-			throw Boom.badRequest(`Unsupported or disabled provider: ${provider}`);
+			throw Boom.badRequest(
+				`Unsupported or disabled provider: ${provider}`
+			);
 		}
 
 		// Create adapter
@@ -200,10 +205,13 @@ export const aiRequestHandler = (config: AppConfig) =>
 				try {
 					// Stream events
 					for await (const event of result.stream) {
-						const data = event.type === 'error' ? JSON.stringify({
-							type: 'error',
-							message: event.error.message,
-						}) : JSON.stringify(event);
+						const data =
+							event.type === 'error'
+								? JSON.stringify({
+										type: 'error',
+										message: event.error.message
+									})
+								: JSON.stringify(event);
 						res.write(`event: ${event.type}\n`);
 						res.write(`data: ${data}\n\n`);
 
@@ -222,23 +230,28 @@ export const aiRequestHandler = (config: AppConfig) =>
 					}
 				} catch (streamError) {
 					// Error escaped the stream generator — send it as SSE error event
-					const message = streamError instanceof Error
-						? streamError.message
-						: String(streamError);
+					const message =
+						streamError instanceof Error
+							? streamError.message
+							: String(streamError);
 					logger.error('Stream iteration error:', streamError);
 					res.write(`event: error\n`);
-					res.write(`data: ${JSON.stringify({ type: 'error', message })}\n\n`);
+					res.write(
+						`data: ${JSON.stringify({ type: 'error', message })}\n\n`
+					);
 				}
 
 				// If stream ended without a completed event, notify the client
 				if (!finalResponse) {
-					logger.warn('Stream ended without completed event', { provider });
+					logger.warn('Stream ended without completed event', {
+						provider
+					});
 				}
 
 				res.end();
 
 				// Track usage after stream completes
-				if (finalResponse && config.onUsage) {
+				if (finalResponse) {
 					await trackUsage(config, {
 						userId: req.userId || 'anonymous',
 						apiKey: req.apiKey || '',
@@ -258,18 +271,17 @@ export const aiRequestHandler = (config: AppConfig) =>
 				});
 
 				// Track usage for non-streaming response
-				if (config.onUsage) {
-					await trackUsage(config, {
-						userId: req.userId || 'anonymous',
-						apiKey: req.apiKey || '',
-						provider,
-						context: parseResult.data.context,
-						response: result.response,
-						startTime
-					}).catch((error) => {
-						logger.error('Usage tracking error:', error);
-					});
-				}
+				await trackUsage(config, {
+					userId: req.userId || 'anonymous',
+					apiKey: req.apiKey || '',
+					provider,
+					context: parseResult.data.context,
+					response: result.response,
+					startTime
+				}).catch((error) => {
+					logger.error('Usage tracking error');
+					logger.error(error);
+				});
 			}
 		} finally {
 			clearTimeout(timeoutId);

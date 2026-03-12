@@ -1,5 +1,6 @@
 import request from 'supertest';
 import nock from 'nock';
+import { jest } from '@jest/globals';
 import {
 	createTestApp,
 	authHeader,
@@ -7,6 +8,7 @@ import {
 	mockStreamingFixture,
 	OPENAI_BASE
 } from '../__tests__/setup.js';
+import type { UsageStats } from '../../types/index.js';
 
 describe('POST /ai/request', () => {
 	let result: ReturnType<typeof createTestApp>;
@@ -154,7 +156,8 @@ describe('POST /ai/request', () => {
 						}
 					],
 					tools: [],
-					instructions: 'You are a test assistant. Reply very briefly.',
+					instructions:
+						'You are a test assistant. Reply very briefly.',
 					metadata: { stream: true }
 				}
 			});
@@ -164,22 +167,22 @@ describe('POST /ai/request', () => {
 
 		// Parse SSE events from response text
 		const sseBlocks = res.text.split('\n\n').filter(Boolean);
-		const events = sseBlocks.map(block => {
+		const events = sseBlocks.map((block) => {
 			const lines = block.split('\n');
-			const eventLine = lines.find(l => l.startsWith('event: '));
-			const dataLine = lines.find(l => l.startsWith('data: '));
+			const eventLine = lines.find((l) => l.startsWith('event: '));
+			const dataLine = lines.find((l) => l.startsWith('data: '));
 			return {
 				type: eventLine?.slice(7),
 				data: dataLine ? JSON.parse(dataLine.slice(6)) : null
 			};
 		});
 
-		const types = events.map(e => e.type);
+		const types = events.map((e) => e.type);
 		expect(types[0]).toBe('created');
 		expect(types).toContain('text-delta');
 		expect(types[types.length - 1]).toBe('completed');
 
-		const completed = events.find(e => e.type === 'completed');
+		const completed = events.find((e) => e.type === 'completed');
 		expect(completed?.data.response.content).toBe('Hello, test!');
 		expect(completed?.data.response.finished).toBe(true);
 	});
@@ -205,7 +208,8 @@ describe('POST /ai/request', () => {
 					tools: [
 						{
 							name: 'get_weather',
-							description: 'Get the current weather for a location',
+							description:
+								'Get the current weather for a location',
 							parameters: [
 								{
 									name: 'location',
@@ -216,7 +220,8 @@ describe('POST /ai/request', () => {
 							]
 						}
 					],
-					instructions: 'You must use the get_weather tool to answer weather questions.',
+					instructions:
+						'You must use the get_weather tool to answer weather questions.',
 					metadata: { stream: true }
 				}
 			});
@@ -225,17 +230,17 @@ describe('POST /ai/request', () => {
 		expect(res.headers['content-type']).toContain('text/event-stream');
 
 		const sseBlocks = res.text.split('\n\n').filter(Boolean);
-		const events = sseBlocks.map(block => {
+		const events = sseBlocks.map((block) => {
 			const lines = block.split('\n');
-			const eventLine = lines.find(l => l.startsWith('event: '));
-			const dataLine = lines.find(l => l.startsWith('data: '));
+			const eventLine = lines.find((l) => l.startsWith('event: '));
+			const dataLine = lines.find((l) => l.startsWith('data: '));
 			return {
 				type: eventLine?.slice(7),
 				data: dataLine ? JSON.parse(dataLine.slice(6)) : null
 			};
 		});
 
-		const completed = events.find(e => e.type === 'completed');
+		const completed = events.find((e) => e.type === 'completed');
 		expect(completed?.data.response.toolCalls).toHaveLength(1);
 		expect(completed?.data.response.toolCalls[0].name).toBe('get_weather');
 		expect(completed?.data.response.toolCalls[0].arguments).toEqual({
@@ -244,14 +249,16 @@ describe('POST /ai/request', () => {
 	});
 
 	it('should handle OpenAI API errors', async () => {
-		nock(OPENAI_BASE).post('/v1/responses').reply(401, {
-			error: {
-				message: 'Incorrect API key provided',
-				type: 'invalid_request_error',
-				param: null,
-				code: 'invalid_api_key'
-			}
-		});
+		nock(OPENAI_BASE)
+			.post('/v1/responses')
+			.reply(401, {
+				error: {
+					message: 'Incorrect API key provided',
+					type: 'invalid_request_error',
+					param: null,
+					code: 'invalid_api_key'
+				}
+			});
 
 		const res = await request(result.app)
 			.post('/ai/request')
@@ -305,17 +312,17 @@ describe('POST /ai/request', () => {
 		expect(res.headers['content-type']).toContain('text/event-stream');
 
 		const sseBlocks = res.text.split('\n\n').filter(Boolean);
-		const events = sseBlocks.map(block => {
+		const events = sseBlocks.map((block) => {
 			const lines = block.split('\n');
-			const eventLine = lines.find(l => l.startsWith('event: '));
-			const dataLine = lines.find(l => l.startsWith('data: '));
+			const eventLine = lines.find((l) => l.startsWith('event: '));
+			const dataLine = lines.find((l) => l.startsWith('data: '));
 			return {
 				type: eventLine?.slice(7),
 				data: dataLine ? JSON.parse(dataLine.slice(6)) : null
 			};
 		});
 
-		const types = events.map(e => e.type);
+		const types = events.map((e) => e.type);
 
 		// Should have a created event followed by an error event
 		expect(types).toContain('created');
@@ -325,21 +332,23 @@ describe('POST /ai/request', () => {
 		expect(types).not.toContain('completed');
 
 		// Error event should contain a meaningful message
-		const errorEvent = events.find(e => e.type === 'error');
+		const errorEvent = events.find((e) => e.type === 'error');
 		expect(errorEvent?.data.type).toBe('error');
 		expect(errorEvent?.data.message).toBeDefined();
 		expect(errorEvent?.data.message.length).toBeGreaterThan(0);
 	});
 
 	it('should send SSE error event when provider returns 401 during streaming', async () => {
-		nock(OPENAI_BASE).post('/v1/responses').reply(401, {
-			error: {
-				message: 'Incorrect API key provided',
-				type: 'invalid_request_error',
-				param: null,
-				code: 'invalid_api_key'
-			}
-		});
+		nock(OPENAI_BASE)
+			.post('/v1/responses')
+			.reply(401, {
+				error: {
+					message: 'Incorrect API key provided',
+					type: 'invalid_request_error',
+					param: null,
+					code: 'invalid_api_key'
+				}
+			});
 
 		const res = await request(result.app)
 			.post('/ai/request')
@@ -365,21 +374,213 @@ describe('POST /ai/request', () => {
 		expect(res.headers['content-type']).toContain('text/event-stream');
 
 		const sseBlocks = res.text.split('\n\n').filter(Boolean);
-		const events = sseBlocks.map(block => {
+		const events = sseBlocks.map((block) => {
 			const lines = block.split('\n');
-			const eventLine = lines.find(l => l.startsWith('event: '));
-			const dataLine = lines.find(l => l.startsWith('data: '));
+			const eventLine = lines.find((l) => l.startsWith('event: '));
+			const dataLine = lines.find((l) => l.startsWith('data: '));
 			return {
 				type: eventLine?.slice(7),
 				data: dataLine ? JSON.parse(dataLine.slice(6)) : null
 			};
 		});
 
-		const types = events.map(e => e.type);
+		const types = events.map((e) => e.type);
 		expect(types).toContain('error');
 		expect(types).not.toContain('completed');
 
-		const errorEvent = events.find(e => e.type === 'error');
+		const errorEvent = events.find((e) => e.type === 'error');
 		expect(errorEvent?.data.message).toBeDefined();
+	});
+
+	describe('onUsage callback', () => {
+		let onUsage: ReturnType<typeof jest.fn>;
+		let appWithUsage: ReturnType<typeof createTestApp>;
+
+		beforeAll(() => {
+			onUsage = jest.fn();
+			appWithUsage = createTestApp({ onUsage: onUsage as never });
+		});
+
+		afterAll(async () => {
+			await appWithUsage.cleanup();
+		});
+
+		beforeEach(() => {
+			onUsage.mockClear();
+		});
+
+		it('should call onUsage after non-streaming request', async () => {
+			mockFixture('openai', 'text-generation');
+
+			const res = await request(appWithUsage.app)
+				.post('/ai/request')
+				.set(authHeader())
+				.send({
+					provider: 'openai',
+					context: {
+						mode: 'full',
+						messages: [
+							{
+								id: 'msg-1',
+								role: 'user',
+								content: 'Say "Hello, test!" and nothing else.',
+								timestamp: Date.now()
+							}
+						],
+						tools: [],
+						instructions:
+							'You are a test assistant. Reply very briefly.'
+					}
+				});
+
+			expect(res.status).toBe(200);
+			expect(onUsage).toHaveBeenCalledTimes(1);
+
+			const stats: UsageStats = onUsage.mock.calls[0][0] as UsageStats;
+			expect(stats).toEqual(
+				expect.objectContaining({
+					userId: 'anonymous',
+					apiKey: '12345678-1234-1234-1234-123456789abc',
+					provider: 'openai',
+					model: 'gpt-4.1-nano',
+					responseId: expect.stringMatching(/^resp_/),
+					promptTokens: 45,
+					completionTokens: 5,
+					totalTokens: 50,
+					timestamp: expect.any(Number),
+					duration: expect.any(Number)
+				})
+			);
+			expect(stats.duration).toBeGreaterThanOrEqual(0);
+			expect(stats.metadata).toBeDefined();
+			expect(stats.metadata?.model).toBe('gpt-4.1-nano');
+			expect(stats.metadata?.usage).toEqual(
+				expect.objectContaining({
+					inputTokens: 45,
+					outputTokens: 5,
+					totalTokens: 50
+				})
+			);
+		});
+
+		it('should call onUsage after streaming request', async () => {
+			mockStreamingFixture('openai', 'text-generation-streaming');
+
+			const res = await request(appWithUsage.app)
+				.post('/ai/request')
+				.set(authHeader())
+				.send({
+					provider: 'openai',
+					context: {
+						mode: 'full',
+						messages: [
+							{
+								id: 'msg-1',
+								role: 'user',
+								content: 'Say "Hello, test!" and nothing else.',
+								timestamp: Date.now()
+							}
+						],
+						tools: [],
+						instructions:
+							'You are a test assistant. Reply very briefly.',
+						metadata: { stream: true }
+					}
+				});
+
+			expect(res.status).toBe(200);
+			expect(onUsage).toHaveBeenCalledTimes(1);
+
+			const stats: UsageStats = onUsage.mock.calls[0][0] as UsageStats;
+			expect(stats).toEqual(
+				expect.objectContaining({
+					userId: 'anonymous',
+					apiKey: '12345678-1234-1234-1234-123456789abc',
+					provider: 'openai',
+					model: 'gpt-4.1-nano',
+					responseId: expect.stringMatching(/^resp_/),
+					promptTokens: 45,
+					completionTokens: 5,
+					totalTokens: 50,
+					timestamp: expect.any(Number),
+					duration: expect.any(Number)
+				})
+			);
+			expect(stats.duration).toBeGreaterThanOrEqual(0);
+			expect(stats.metadata).toBeDefined();
+			expect(stats.metadata?.usage).toEqual(
+				expect.objectContaining({
+					inputTokens: 45,
+					outputTokens: 5,
+					totalTokens: 50
+				})
+			);
+		});
+
+		it('should not fail request when onUsage throws', async () => {
+			onUsage.mockRejectedValue(new Error('DB write failed'));
+			mockFixture('openai', 'text-generation');
+
+			const res = await request(appWithUsage.app)
+				.post('/ai/request')
+				.set(authHeader())
+				.send({
+					provider: 'openai',
+					context: {
+						mode: 'full',
+						messages: [
+							{
+								id: 'msg-1',
+								role: 'user',
+								content: 'Say "Hello, test!" and nothing else.',
+								timestamp: Date.now()
+							}
+						],
+						tools: [],
+						instructions:
+							'You are a test assistant. Reply very briefly.'
+					}
+				});
+
+			expect(res.status).toBe(200);
+			expect(res.body.success).toBe(true);
+			expect(onUsage).toHaveBeenCalledTimes(1);
+		});
+
+		it('should not call onUsage when streaming errors without completed event', async () => {
+			nock(OPENAI_BASE)
+				.post('/v1/responses')
+				.reply(401, {
+					error: {
+						message: 'Incorrect API key provided',
+						type: 'invalid_request_error',
+						param: null,
+						code: 'invalid_api_key'
+					}
+				});
+
+			const res = await request(appWithUsage.app)
+				.post('/ai/request')
+				.set(authHeader())
+				.send({
+					provider: 'openai',
+					context: {
+						mode: 'full',
+						messages: [
+							{
+								id: 'msg-1',
+								role: 'user',
+								content: 'Hello',
+								timestamp: Date.now()
+							}
+						],
+						tools: [],
+						metadata: { stream: true }
+					}
+				});
+
+			expect(res.status).toBe(200);
+			expect(onUsage).not.toHaveBeenCalled();
+		});
 	});
 });
