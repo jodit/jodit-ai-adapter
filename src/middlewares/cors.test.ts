@@ -45,7 +45,7 @@ describe('corsMiddleware', () => {
 				'GET, POST, OPTIONS, PUT, DELETE'
 			);
 			expect(res.headers['access-control-allow-headers']).toBe(
-				'Content-Type, Authorization, x-api-key'
+				'Content-Type, Authorization, x-api-key, x-requested-with'
 			);
 			expect(res.headers['access-control-allow-credentials']).toBe(
 				'true'
