@@ -11,6 +11,7 @@
 | `RATE_LIMIT_ENABLED` | Enable rate limiting | `false` |
 | `RATE_LIMIT_TYPE` | Rate limiter type (`memory` or `redis`) | `memory` |
 | `REDIS_URL` | Redis connection URL | - |
+| `CORS_ORIGIN` | CORS allowed origins | `*` |
 | `ROUTE_PREFIX` | Route prefix for all endpoints | `/ai` |
 | `CONFIG_FILE` | Path to JSON config file | - |
 
@@ -68,6 +69,53 @@ docker run -p 8082:8082 \
   -e CONFIG_FILE=/app/config.json \
   xdsoft/jodit-ai-adapter
 ```
+
+## CORS Configuration
+
+By default the server allows all origins (`*`). For fine-grained control, use the `cors` object
+(it takes precedence over the legacy `corsOrigin` / `CORS_ORIGIN` setting):
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `origin` | `string \| string[] \| RegExp` | `*` | Allowed origin(s) |
+| `methods` | `string` | `GET, POST, OPTIONS, PUT, DELETE` | Allowed HTTP methods |
+| `allowedHeaders` | `string` | `Content-Type, Authorization, x-api-key, x-requested-with` | Allowed request headers |
+| `credentials` | `boolean` | `true` | Send `Access-Control-Allow-Credentials` |
+| `maxAge` | `number` | `86400` | Preflight cache duration in seconds |
+
+### JSON config file
+
+```json
+{
+  "cors": {
+    "origin": "https://app.example.com",
+    "methods": "GET, POST",
+    "credentials": true,
+    "maxAge": 3600
+  }
+}
+```
+
+### Programmatic usage
+
+```typescript
+import { createApp } from 'jodit-ai-adapter';
+
+const { app } = createApp({
+  cors: {
+    origin: ['https://app.example.com', 'https://admin.example.com'],
+    methods: 'GET, POST',
+    allowedHeaders: 'Content-Type, Authorization',
+    credentials: true,
+    maxAge: 3600
+  },
+  providers: { /* ... */ }
+});
+```
+
+!!! tip
+    For simple cases you can still use just `corsOrigin: '*'` or `CORS_ORIGIN=https://example.com`.
+    The `cors` object is only needed when you want to customise methods, headers, credentials or max-age.
 
 ## Programmatic Configuration
 

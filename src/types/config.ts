@@ -127,6 +127,26 @@ export interface RateLimiterConfig {
 }
 
 /**
+ * CORS configuration
+ */
+export interface CorsConfig {
+	/** Allowed origin (can be array or string or regex) */
+	origin?: string | string[] | RegExp;
+
+	/** Allowed HTTP methods (default: 'GET, POST, OPTIONS, PUT, DELETE') */
+	methods?: string;
+
+	/** Allowed headers (default: 'Content-Type, Authorization, x-api-key') */
+	allowedHeaders?: string;
+
+	/** Whether to include credentials (default: true) */
+	credentials?: boolean;
+
+	/** Preflight cache duration in seconds (default: 86400) */
+	maxAge?: number;
+}
+
+/**
  * Application configuration
  */
 export interface AppConfig {
@@ -144,6 +164,9 @@ export interface AppConfig {
 
 	/** CORS origin (can be array or string or regex) */
 	corsOrigin?: string | string[] | RegExp;
+
+	/** CORS configuration (takes precedence over corsOrigin) */
+	cors?: CorsConfig;
 
 	/** Authentication callback */
 	checkAuthentication?: AuthCallback;

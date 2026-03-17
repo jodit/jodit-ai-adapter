@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.7]
+
+### Added
+- `CorsConfig` interface for fine-grained CORS control (`cors` field in `AppConfig`)
+- Configurable `methods`, `allowedHeaders`, `credentials`, and `maxAge` CORS options
+- `x-requested-with` added to default allowed headers
+- CORS middleware tests (14 cases)
+- CORS configuration section in documentation
+
 ## [0.1.23]
 
 ### Added
