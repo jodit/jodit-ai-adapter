@@ -154,6 +154,31 @@ describe('corsMiddleware', () => {
 		});
 	});
 
+	describe('disabled', () => {
+		it('should not set any CORS headers when enabled is false', async () => {
+			const app = createApp({ cors: { enabled: false } });
+			const res = await request(app)
+				.get('/test')
+				.set('Origin', 'http://example.com');
+
+			expect(res.headers['access-control-allow-origin']).toBeUndefined();
+			expect(res.headers['access-control-allow-methods']).toBeUndefined();
+			expect(res.headers['access-control-allow-headers']).toBeUndefined();
+			expect(res.headers['access-control-allow-credentials']).toBeUndefined();
+			expect(res.headers['access-control-max-age']).toBeUndefined();
+		});
+
+		it('should not handle preflight when enabled is false', async () => {
+			const app = createApp({ cors: { enabled: false } });
+			const res = await request(app)
+				.options('/test')
+				.set('Origin', 'http://example.com');
+
+			// Without CORS middleware handling OPTIONS, express returns default behavior
+			expect(res.headers['access-control-allow-origin']).toBeUndefined();
+		});
+	});
+
 	describe('preflight', () => {
 		it('responds 204 to OPTIONS requests', async () => {
 			const res = await request(createApp())

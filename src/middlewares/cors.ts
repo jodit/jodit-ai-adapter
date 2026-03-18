@@ -11,6 +11,13 @@ const DEFAULT_MAX_AGE = '86400';
  */
 export function corsMiddleware(config: AppConfig) {
 	const corsConfig = config.cors;
+
+	if (corsConfig?.enabled === false) {
+		return (_req: Request, _res: Response, next: NextFunction): void => {
+			next();
+		};
+	}
+
 	const corsOrigin = corsConfig?.origin ?? config.corsOrigin;
 	const methods = corsConfig?.methods ?? DEFAULT_METHODS;
 	const allowedHeaders =

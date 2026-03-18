@@ -130,6 +130,9 @@ export interface RateLimiterConfig {
  * CORS configuration
  */
 export interface CorsConfig {
+	/** Whether CORS headers are enabled (default: true). Set to false to disable completely */
+	enabled?: boolean;
+
 	/** Allowed origin (can be array or string or regex) */
 	origin?: string | string[] | RegExp;
 
