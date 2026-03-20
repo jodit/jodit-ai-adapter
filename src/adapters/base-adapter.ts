@@ -1,6 +1,7 @@
 import {
 	tool,
 	generateText,
+	generateObject,
 	streamText,
 	ModelMessage,
 	ToolSet,
@@ -10,6 +11,7 @@ import {
 	type LanguageModel,
 	type JSONValue
 } from 'ai';
+import { z } from 'zod';
 import type {
 	IAIRequestContext,
 	IAIAssistantResult,
@@ -21,6 +23,8 @@ import type {
 	IToolCall,
 	IImageGenerationRequest,
 	IImageGenerationResponse,
+	IAutocompleteRequest,
+	IAutocompleteResponse,
 	StreamTextParams,
 	ProviderUsage,
 	CreditsCost
@@ -301,6 +305,64 @@ export abstract class BaseAdapter {
 		_signal?: AbortSignal
 	): Promise<IImageGenerationResponse> {
 		throw new Error('Image generation is not supported by this provider');
+	}
+
+	/**
+	 * Handle autocomplete request using structured output (generateObject)
+	 * Returns an array of text completions for the given query
+	 */
+	async handleAutocomplete(
+		request: IAutocompleteRequest,
+		signal?: AbortSignal
+	): Promise<IAutocompleteResponse> {
+		const model = request.model || this.config.defaultModel || this.getDefaultFallbackModel();
+		const maxSuggestions = request.maxSuggestions || 5;
+
+		logger.debug('Handling autocomplete request', {
+			query: request.query.substring(0, 100),
+			model,
+			maxSuggestions
+		});
+
+		const messages: ModelMessage[] = [];
+
+		if (request.instructions) {
+			messages.push({
+				role: 'system',
+				content: request.instructions
+			});
+		}
+
+		messages.push({
+			role: 'user',
+			content: `Provide ${maxSuggestions} autocomplete suggestions for the following text. Each suggestion should be a natural continuation of the input text.\n\nInput: "${request.query}"`
+		});
+
+		const result = await generateObject({
+			model: this.createLanguageModel(model),
+			messages,
+			temperature: request.temperature ?? 0.3,
+			schema: z.object({
+				suggestions: z.array(z.string()).describe('Array of autocomplete text suggestions')
+			}),
+			abortSignal: signal
+		});
+
+		const responseId = result.response?.id || this.generateResponseId('ac');
+
+		logger.debug('Autocomplete completed', {
+			responseId,
+			suggestionCount: result.object.suggestions.length
+		});
+
+		return {
+			responseId,
+			suggestions: result.object.suggestions.slice(0, maxSuggestions),
+			metadata: {
+				model,
+				usage: result.usage
+			}
+		};
 	}
 
 	/**

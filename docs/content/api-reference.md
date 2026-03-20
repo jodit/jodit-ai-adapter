@@ -69,6 +69,74 @@ Returns a list of configured AI providers.
 
 ---
 
+## Autocomplete
+
+```http
+POST /ai/autocomplete?query=How+to+make+a
+Content-Type: application/json
+```
+
+Returns structured autocomplete suggestions for the given query text. Uses structured output (JSON schema) — non-streaming.
+
+**Query Parameters:**
+
+| Parameter | Type   | Required | Description                    |
+|-----------|--------|----------|--------------------------------|
+| `query`   | string | Yes      | The text to autocomplete       |
+
+**Request Body:**
+
+```json
+{
+  "provider": "openai",
+  "context": {
+    "instructions": "You are a helpful writing assistant.",
+    "conversationOptions": {
+      "model": "gpt-4.1-nano",
+      "temperature": 0.3
+    },
+    "maxSuggestions": 5
+  }
+}
+```
+
+| Field                              | Type   | Required | Description                         |
+|------------------------------------|--------|----------|-------------------------------------|
+| `provider`                         | string | Yes      | AI provider name                    |
+| `context`                          | object | No       | Optional context                    |
+| `context.instructions`             | string | No       | System instructions for the AI      |
+| `context.conversationOptions.model`| string | No       | AI model to use                     |
+| `context.conversationOptions.temperature` | number | No | Temperature (0-2)              |
+| `context.maxSuggestions`           | number | No       | Max suggestions (1-10, default 5)   |
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "result": {
+    "responseId": "resp_ac_001...",
+    "suggestions": [
+      "cake with chocolate frosting",
+      "website from scratch",
+      "good first impression",
+      "budget for your project",
+      "presentation that stands out"
+    ],
+    "metadata": {
+      "model": "gpt-4.1-nano",
+      "usage": {
+        "inputTokens": 60,
+        "outputTokens": 30,
+        "totalTokens": 90
+      }
+    }
+  }
+}
+```
+
+---
+
 ## Image Generation
 
 ```http

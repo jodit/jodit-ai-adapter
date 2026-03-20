@@ -15,6 +15,7 @@ import healthRouter from './routes/health';
 import { createImageGenerateRouter } from './routes/image-generate';
 import { createAiRequestRouter } from './routes/request';
 import { createAiProvidersRouter } from './routes/providers';
+import { createAutocompleteRouter } from './routes/autocomplete';
 import packageJson from '../package.json' with { type: 'json' };
 
 /**
@@ -113,6 +114,7 @@ export function createApp(
 	router.use('/image', createImageGenerateRouter(appConfig));
 	router.use('/request', createAiRequestRouter(appConfig));
 	router.use('/providers', createAiProvidersRouter(appConfig));
+	router.use('/autocomplete', createAutocompleteRouter(appConfig));
 
 	// Error handler
 	router.use(

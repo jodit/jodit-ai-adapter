@@ -177,3 +177,24 @@ export interface IAIAssistantRequester {
 		signal: AbortSignal
 	): Promise<IAIAssistantResult>;
 }
+
+/**
+ * Autocomplete request
+ */
+export interface IAutocompleteRequest {
+	readonly query: string;
+	readonly instructions?: string;
+	readonly model?: string;
+	readonly temperature?: number;
+	readonly maxSuggestions?: number;
+	readonly metadata?: Record<string, unknown>;
+}
+
+/**
+ * Autocomplete response
+ */
+export interface IAutocompleteResponse {
+	readonly responseId: string;
+	readonly suggestions: string[];
+	readonly metadata?: Record<string, unknown>;
+}

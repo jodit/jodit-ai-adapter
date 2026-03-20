@@ -1,0 +1,122 @@
+{
+	"request": {
+		"url": "https://api.openai.com/v1/responses",
+		"method": "POST",
+		"body": {
+			"model": "gpt-4.1-nano",
+			"input": [
+				{
+					"role": "user",
+					"content": [
+						{
+							"type": "input_text",
+							"text": "Provide 5 autocomplete suggestions for the following text. Each suggestion should be a natural continuation of the input text.\n\nInput: \"How to make a\""
+						}
+					]
+				}
+			],
+			"max_output_tokens": 1024,
+			"text": {
+				"format": {
+					"type": "json_schema",
+					"name": "suggestions",
+					"schema": {
+						"type": "object",
+						"properties": {
+							"suggestions": {
+								"type": "array",
+								"items": { "type": "string" }
+							}
+						},
+						"required": ["suggestions"]
+					}
+				}
+			}
+		}
+	},
+	"response": {
+		"status": 200,
+		"body": {
+			"id": "resp_ac_001a7b5feb78d356006987292f611481978ca289da9bfe1234",
+			"object": "response",
+			"created_at": 1770465590,
+			"status": "completed",
+			"background": false,
+			"billing": {
+				"payer": "openai"
+			},
+			"completed_at": 1770465591,
+			"error": null,
+			"frequency_penalty": 0,
+			"incomplete_details": null,
+			"instructions": null,
+			"max_output_tokens": 1024,
+			"max_tool_calls": null,
+			"model": "gpt-4.1-nano-2025-04-14",
+			"output": [
+				{
+					"id": "msg_ac_001a7b5feb78d35600698729301d008197853e121214639445",
+					"type": "message",
+					"status": "completed",
+					"content": [
+						{
+							"type": "output_text",
+							"annotations": [],
+							"logprobs": [],
+							"text": "{\"suggestions\":[\"cake with chocolate frosting\",\"website from scratch\",\"good first impression\",\"budget for your project\",\"presentation that stands out\"]}"
+						}
+					],
+					"role": "assistant"
+				}
+			],
+			"parallel_tool_calls": true,
+			"presence_penalty": 0,
+			"previous_response_id": null,
+			"prompt_cache_key": null,
+			"prompt_cache_retention": null,
+			"reasoning": {
+				"effort": null,
+				"summary": null
+			},
+			"safety_identifier": null,
+			"service_tier": "default",
+			"store": true,
+			"temperature": 0.3,
+			"text": {
+				"format": {
+					"type": "json_schema",
+					"name": "suggestions",
+					"schema": {
+						"type": "object",
+						"properties": {
+							"suggestions": {
+								"type": "array",
+								"items": { "type": "string" }
+							}
+						},
+						"required": ["suggestions"]
+					}
+				},
+				"verbosity": "medium"
+			},
+			"tool_choice": "auto",
+			"tools": [],
+			"top_logprobs": 0,
+			"top_p": 1,
+			"truncation": "disabled",
+			"usage": {
+				"input_tokens": 60,
+				"input_tokens_details": {
+					"cached_tokens": 0
+				},
+				"output_tokens": 30,
+				"output_tokens_details": {
+					"reasoning_tokens": 0
+				},
+				"total_tokens": 90
+			},
+			"user": null,
+			"metadata": {}
+		}
+	}
+}
