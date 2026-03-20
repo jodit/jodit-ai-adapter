@@ -31,7 +31,7 @@ import type {
 } from '../types';
 import { logger } from '../helpers/logger';
 
-const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
+const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 
 type GenerateTextResult = { toolCalls: Array<{ toolCallId: string; toolName: string; input: unknown }> };
 
@@ -195,6 +195,18 @@ export abstract class BaseAdapter {
 						const finalResponse = await result.response;
 						const resolvedToolCalls = await result.toolCalls;
 						const toolCalls = extractToolCalls({ toolCalls: resolvedToolCalls });
+
+						if (!fullText && toolCalls.length === 0) {
+							logger.warn('Stream completed with empty response', {
+								responseId: finalResponse.id || responseId,
+								model: modelId
+							});
+							yield {
+								type: 'error',
+								error: new Error('Empty response from AI provider: no text and no tool calls were generated')
+							};
+							return;
+						}
 
 						yield {
 							type: 'completed',

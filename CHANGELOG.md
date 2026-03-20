@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.11]
+
+### Fixed
+- Increased `DEFAULT_MAX_OUTPUT_TOKENS` from 1024 to 8192 to prevent truncated tool call arguments on long responses
+- Empty streaming responses (no text and no tool calls) now emit an SSE `error` event instead of a silent empty `completed`
+
+### Added
+- Streaming fixture `empty-response-streaming.txt` for empty response scenario
+- Test case for empty stream error handling
+
 ## [0.2.8]
 
 ### Added

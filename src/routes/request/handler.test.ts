@@ -248,6 +248,65 @@ describe('POST /ai/request', () => {
 		});
 	});
 
+	it('should send SSE error event when stream completes with empty response', async () => {
+		mockStreamingFixture('openai', 'empty-response-streaming');
+
+		const res = await request(result.app)
+			.post('/ai/request')
+			.set(authHeader())
+			.send({
+				provider: 'openai',
+				context: {
+					mode: 'full',
+					messages: [
+						{
+							id: 'msg-1',
+							role: 'user',
+							content:
+								'Write a very long article and insert it into the editor.',
+							timestamp: Date.now()
+						}
+					],
+					tools: [
+						{
+							name: 'writeDocument',
+							description: 'Write HTML content to the editor',
+							parameters: [
+								{
+									name: 'html',
+									type: 'string',
+									description: 'HTML content',
+									required: true
+								}
+							]
+						}
+					],
+					metadata: { stream: true }
+				}
+			});
+
+		expect(res.status).toBe(200);
+		expect(res.headers['content-type']).toContain('text/event-stream');
+
+		const sseBlocks = res.text.split('\n\n').filter(Boolean);
+		const events = sseBlocks.map((block) => {
+			const lines = block.split('\n');
+			const eventLine = lines.find((l) => l.startsWith('event: '));
+			const dataLine = lines.find((l) => l.startsWith('data: '));
+			return {
+				type: eventLine?.slice(7),
+				data: dataLine ? JSON.parse(dataLine.slice(6)) : null
+			};
+		});
+
+		const errorEvent = events.find((e) => e.type === 'error');
+		expect(errorEvent).toBeDefined();
+		expect(errorEvent?.data.message).toContain('Empty response');
+
+		const completed = events.find((e) => e.type === 'completed');
+		expect(completed).toBeUndefined();
+	});
+
 	it('should handle OpenAI API errors', async () => {
 		nock(OPENAI_BASE)
 			.post('/v1/responses')
