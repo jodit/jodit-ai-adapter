@@ -27,7 +27,8 @@ import type {
 	IAutocompleteResponse,
 	StreamTextParams,
 	ProviderUsage,
-	CreditsCost
+	CreditsCost,
+	ITranscriptionSession
 } from '../types';
 import { logger } from '../helpers/logger';
 
@@ -317,6 +318,25 @@ export abstract class BaseAdapter {
 		_signal?: AbortSignal
 	): Promise<IImageGenerationResponse> {
 		throw new Error('Image generation is not supported by this provider');
+	}
+
+	/**
+	 * Run a realtime speech-to-text transcription session — default
+	 * implementation throws "not supported".
+	 *
+	 * Override in provider adapters that support streaming transcription: read
+	 * binary audio frames from `session.client`, stream them to the provider's
+	 * realtime API, emit JSON transcript events (`delta` / `final` / `error`)
+	 * back over the same socket, and call `session.reportUsage` when the session
+	 * ends so the usage can be billed. The returned promise resolves when the
+	 * session is finished (socket closed or aborted via `session.signal`).
+	 */
+	async openTranscriptionSession(
+		_session: ITranscriptionSession
+	): Promise<void> {
+		throw new Error(
+			'Speech-to-text transcription is not supported by this provider'
+		);
 	}
 
 	/**

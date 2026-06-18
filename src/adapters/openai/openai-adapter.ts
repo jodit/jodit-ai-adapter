@@ -5,12 +5,14 @@ import type {
 	IAIRequestContext,
 	IImageGenerationRequest,
 	IImageGenerationResponse,
+	ITranscriptionSession,
 	ProviderUsage
 } from '../../types';
 import { BaseAdapter, type BaseAdapterConfig } from '../base-adapter';
 import { logger } from '../../helpers/logger';
 import { createFetch } from '../../helpers/proxy';
 import { calculateCredits } from './credit';
+import { runOpenAITranscriptionSession } from './realtime-transcription';
 
 /**
  * OpenAI adapter using Vercel AI SDK
@@ -100,7 +102,7 @@ export class OpenAIAdapter extends BaseAdapter {
 
 		return {
 			images: result.images.map((img) => ({
-				b64_json: img.base64,
+				b64_json: img.base64
 			})),
 			created: Date.now(),
 			metadata: {
@@ -109,5 +111,20 @@ export class OpenAIAdapter extends BaseAdapter {
 				usage: result.usage
 			}
 		};
+	}
+
+	/**
+	 * Run a realtime speech-to-text session against the OpenAI Realtime API.
+	 * The endpoint can be overridden via `config.options.realtimeTranscriptionUrl`
+	 * (used by tests and self-hosted gateways).
+	 */
+	override async openTranscriptionSession(
+		session: ITranscriptionSession
+	): Promise<void> {
+		const overrideUrl = this.config.options?.realtimeTranscriptionUrl;
+		return runOpenAITranscriptionSession(session, {
+			apiKey: this.config.apiKey,
+			url: typeof overrideUrl === 'string' ? overrideUrl : undefined
+		});
 	}
 }

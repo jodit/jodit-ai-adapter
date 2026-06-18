@@ -1,9 +1,17 @@
 import type { Server, IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
-import { WebSocketServer, type WebSocket } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws';
 import Boom from '@hapi/boom';
-import type { AppConfig } from '../types';
+import type {
+	AppConfig,
+	AIProvider,
+	ITranscriptionSession,
+	ITranscriptionUsage,
+	UsageStats
+} from '../types';
 import { logger } from '../helpers/logger';
+import { AdapterFactory } from '../adapters/adapter-factory';
+import type { BaseAdapter } from '../adapters/base-adapter';
 import {
 	DEFAULT_API_KEY_PATTERN,
 	validateApiKeyFormat,
@@ -14,14 +22,14 @@ import {
  * Speech-to-text transcription WebSocket endpoint.
  *
  * Mounted at `${routePrefix}/transcribe` (default `/ai/transcribe`). The browser
- * streams microphone audio over this socket; the server proxies it to OpenAI
- * Realtime transcription so the OpenAI key stays server-side and usage can be
- * metered (added in a later step).
+ * streams binary PCM16 microphone audio over this socket; the server resolves
+ * the provider adapter and runs a realtime transcription session
+ * (`adapter.openTranscriptionSession`) so the provider key stays server-side.
+ * Transcript events (`ready` / `delta` / `final` / `error`) come back as JSON
+ * text frames, and audio usage is reported through `config.onUsage` with the
+ * same credits cost as text requests.
  *
- * This module (A1) provides the authenticated transport scaffold only — the
- * realtime OpenAI session is wired in A3. The handler currently acknowledges
- * readiness and echoes text control frames so the transport can be tested end
- * to end.
+ * Query params: `provider` (defaults to `openai`), `model`, `language`.
  */
 
 const TRANSCRIBE_PATH_SUFFIX = '/transcribe';
@@ -133,35 +141,144 @@ function rejectUpgrade(
 	socket.destroy();
 }
 
+interface SessionParams {
+	provider?: string;
+	model?: string;
+	language?: string;
+}
+
+/** Read `provider` / `model` / `language` from the upgrade request URL. */
+function parseSessionParams(req: IncomingMessage): SessionParams {
+	const url = new URL(req.url ?? '', 'http://localhost');
+	return {
+		provider: url.searchParams.get('provider') ?? undefined,
+		model: url.searchParams.get('model') ?? undefined,
+		language:
+			url.searchParams.get('language') ??
+			url.searchParams.get('lang') ??
+			undefined
+	};
+}
+
+/** Pick the requested provider, else `openai`, else the first configured one. */
+function resolveProviderName(
+	config: AppConfig,
+	requested?: string
+): string | undefined {
+	if (requested && config.providers[requested]) {
+		return requested;
+	}
+	if (config.providers.openai) {
+		return 'openai';
+	}
+	return Object.keys(config.providers)[0];
+}
+
+function sendError(ws: WebSocket, message: string): void {
+	if (ws.readyState === WebSocket.OPEN) {
+		ws.send(JSON.stringify({ type: 'error', message }));
+	}
+	ws.close();
+}
+
+/**
+ * Convert a finished session's token usage into a credits cost and forward it to
+ * `config.onUsage`, reusing the same path as text requests. Audio input tokens
+ * are billed at the model's audio rate (see `credit.ts`).
+ */
+function routeTranscriptionUsage(
+	config: AppConfig,
+	adapter: BaseAdapter,
+	auth: TranscriptionAuthContext,
+	provider: string,
+	usage: ITranscriptionUsage
+): void {
+	if (!config.onUsage) {
+		return;
+	}
+	let credits;
+	try {
+		credits = adapter.calculateCredits(usage.model, usage);
+	} catch {
+		logger.warn(`No pricing for transcription model: ${usage.model}`);
+		return;
+	}
+	const stats: UsageStats = {
+		userId: auth.userId ?? '',
+		apiKey: auth.apiKey,
+		provider,
+		model: usage.model,
+		responseId: '',
+		promptTokens: usage.inputTokens,
+		completionTokens: usage.outputTokens,
+		totalTokens: (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
+		timestamp: Date.now(),
+		duration: 0,
+		metadata: {
+			kind: 'transcription',
+			audioInputTokens: usage.audioInputTokens
+		},
+		credits
+	};
+	void Promise.resolve(config.onUsage(stats)).catch((error: unknown) => {
+		logger.error('Transcription onUsage callback failed', { error });
+	});
+}
+
 function handleConnection(
 	ws: WebSocket,
-	authContext: TranscriptionAuthContext
+	config: AppConfig,
+	auth: TranscriptionAuthContext,
+	params: SessionParams
 ): void {
-	logger.info('Transcription socket opened', {
-		userId: authContext.userId ?? 'anonymous'
+	const providerName = resolveProviderName(config, params.provider);
+	const providerConfig = providerName
+		? config.providers[providerName]
+		: undefined;
+
+	if (!providerName || !providerConfig) {
+		logger.warn('Transcription requested with no configured provider');
+		sendError(ws, 'No transcription provider configured');
+		return;
+	}
+
+	let adapter: BaseAdapter;
+	try {
+		adapter = AdapterFactory.createAdapter(
+			providerName as AIProvider,
+			providerConfig
+		);
+	} catch (error) {
+		logger.error('Failed to create transcription adapter', { error });
+		sendError(ws, 'Transcription provider unavailable');
+		return;
+	}
+
+	logger.info('Transcription session started', {
+		userId: auth.userId ?? 'anonymous',
+		provider: providerName,
+		model: params.model ?? '(default)'
 	});
 
-	ws.send(JSON.stringify({ type: 'ready' }));
+	// Abort the provider session when the browser socket goes away.
+	const controller = new AbortController();
+	ws.on('close', () => controller.abort());
+	ws.on('error', () => controller.abort());
 
-	ws.on('message', (data: Buffer, isBinary: boolean) => {
-		// A1 placeholder: the realtime OpenAI pipe is added in A3. For now, echo
-		// text control frames so the transport can be verified end to end; audio
-		// (binary) frames are accepted and ignored.
-		if (!isBinary) {
-			ws.send(
-				JSON.stringify({ type: 'echo', text: data.toString('utf8') })
-			);
-		}
-	});
+	const session: ITranscriptionSession = {
+		client: ws,
+		context: { model: params.model, language: params.language },
+		signal: controller.signal,
+		reportUsage: (usage) =>
+			routeTranscriptionUsage(config, adapter, auth, providerName, usage)
+	};
 
-	ws.on('close', () => {
-		logger.info('Transcription socket closed', {
-			userId: authContext.userId ?? 'anonymous'
-		});
-	});
-
-	ws.on('error', (error: Error) => {
-		logger.error('Transcription socket error', { error });
+	adapter.openTranscriptionSession(session).catch((error: unknown) => {
+		logger.error('Transcription session error', { error });
+		sendError(
+			ws,
+			error instanceof Error ? error.message : 'Transcription failed'
+		);
 	});
 }
 
@@ -195,8 +312,9 @@ export function attachTranscriptionWs(
 
 		authenticateUpgrade(config, req)
 			.then((authContext) => {
+				const params = parseSessionParams(req);
 				wss.handleUpgrade(req, socket, head, (ws) => {
-					handleConnection(ws, authContext);
+					handleConnection(ws, config, authContext, params);
 				});
 			})
 			.catch((error: unknown) => {

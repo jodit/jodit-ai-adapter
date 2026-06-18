@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.13]
+
+### Added
+- **Provider transcription contract** — `BaseAdapter.openTranscriptionSession(session)`
+  (default throws "not supported", like `handleImageGeneration`) plus the
+  `ITranscriptionSession` / `ITranscriptionContext` / `ITranscriptionUsage` types.
+  Provider adapters override it to run a realtime speech-to-text session.
+- **OpenAI Realtime transcription session** (`runOpenAITranscriptionSession`,
+  wired through `OpenAIAdapter.openTranscriptionSession`) — opens the OpenAI
+  realtime transcription WebSocket with the server-held key, streams the client's
+  binary PCM16 audio as `input_audio_buffer.append`, and translates OpenAI's
+  `delta` / `completed` / `error` events into the client protocol
+  (`ready` / `delta` / `final` / `error`). Model + language are caller-chosen;
+  accumulated audio/text token usage is reported via `reportUsage`. Endpoint
+  overridable through `config.options.realtimeTranscriptionUrl`.
+- **End-to-end `/ai/transcribe` wiring** — the WebSocket endpoint now resolves the
+  provider adapter (from the `provider` / `model` / `language` query params, default
+  `openai`) and runs a real transcription session instead of the placeholder echo.
+  Session usage is converted to a credits cost and forwarded through `config.onUsage`,
+  exactly like text requests.
+- **Transcription pricing** — `gpt-4o-mini-transcribe` and `gpt-4o-transcribe`
+  added to `model-pricing.json` with an `audioInput` rate; `calculateCredits` bills
+  audio input tokens at the audio rate and the remaining input tokens as text.
+
 ## [0.2.12]
 
 ### Added

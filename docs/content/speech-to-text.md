@@ -26,6 +26,15 @@ default configuration the socket URL is:
 wss://your-host/ai/transcribe?key=<api-key>
 ```
 
+Optional query parameters select the provider and model (like the other adapter
+handlers; all default sensibly):
+
+| Param | Default | Meaning |
+| --- | --- | --- |
+| `provider` | `openai` | Configured provider to use |
+| `model` | provider default (`gpt-4o-mini-transcribe`) | Transcription model |
+| `language` | `en` | BCP-47 language hint (e.g. `en-US`) |
+
 ## Authentication
 
 Authentication happens during the upgrade handshake and uses the **same rules as
@@ -69,10 +78,10 @@ Server → client events:
 ```
 
 !!! info "Status"
-    `ready` is live today; `delta` / `final` transcript events arrive once the
-    realtime provider pipe lands (the socket currently accepts audio frames and
-    echoes text frames so the transport can be verified). The frame **format**
-    above is stable, so client code written against it will not need to change.
+    The endpoint is fully wired: it authenticates the upgrade, resolves the
+    provider adapter, runs a realtime transcription session, and meters audio
+    usage through `onUsage`. The OpenAI provider emits `ready`, then `delta`
+    (interim) and `final` (committed) transcripts, and `error` on failure.
 
 ## Sending microphone audio from the browser
 
@@ -154,6 +163,25 @@ socket.addEventListener('message', (event) => {
 > microphone button that wires the capture above into the assistant prompt for
 > you (it reuses the editor's `speech-recognize` plumbing). This raw example is
 > for non-Jodit integrations or for understanding the protocol.
+
+## Provider support
+
+Transcription is a **provider capability**. Each provider adapter may implement
+`openTranscriptionSession(session)`; the base adapter's default throws
+*"Speech-to-text transcription is not supported by this provider"*, so a provider
+that hasn't implemented it fails fast with a clear message.
+
+A session carries the browser-facing socket, the resolved options
+(`{ model, language }`, chosen by the caller like every other handler), an
+`AbortSignal`, and a `reportUsage` callback the transport supplies so audio usage
+flows through the same credits → `onUsage` path as text requests. See the
+`ITranscriptionSession` / `ITranscriptionContext` / `ITranscriptionUsage` types.
+
+The **OpenAI** adapter implements this against the OpenAI Realtime transcription
+API (the realtime endpoint can be overridden with
+`config.options.realtimeTranscriptionUrl`). It sends `ready` once the upstream
+session is live, forwards interim `delta` and committed `final` transcripts, and
+reports audio/text token usage when the session ends.
 
 ## Standalone vs. integration
 

@@ -1,11 +1,17 @@
 import http from 'node:http';
 import type { AddressInfo, Socket } from 'node:net';
-import WebSocket from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 import { attachTranscriptionWs } from './transcription-ws.js';
-import type { AppConfig } from '../types/index.js';
+import type { AppConfig, UsageStats } from '../types/index.js';
 
 /** 36-char key matching the default `/^[A-F0-9-]{36}$/i` pattern. */
 const VALID_KEY = 'AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE';
+
+interface ClientEvent {
+	type: string;
+	text?: string;
+	message?: string;
+}
 
 function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
 	return {
@@ -21,6 +27,31 @@ function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
 	};
 }
 
+/** Fake OpenAI realtime endpoint: replays scripted events on the first append. */
+function startFakeOpenAI(
+	script: (socket: WebSocket) => void
+): Promise<{ url: string; close: () => Promise<void> }> {
+	const wss = new WebSocketServer({ port: 0 });
+	wss.on('connection', (socket) => {
+		socket.on('message', (raw: Buffer) => {
+			const msg = JSON.parse(raw.toString()) as { type: string };
+			if (msg.type === 'input_audio_buffer.append') {
+				script(socket);
+			}
+		});
+	});
+	return new Promise((resolve) => {
+		wss.on('listening', () => {
+			const { port } = wss.address() as AddressInfo;
+			resolve({
+				url: `ws://127.0.0.1:${port}`,
+				close: () =>
+					new Promise<void>((done) => wss.close(() => done()))
+			});
+		});
+	});
+}
+
 async function startServer(
 	config: AppConfig
 ): Promise<{ url: string; close: () => Promise<void> }> {
@@ -28,9 +59,7 @@ async function startServer(
 		res.writeHead(426);
 		res.end();
 	});
-	// Track every socket so teardown can force-destroy them. An upgrade on an
-	// ignored path leaves a lingering raw socket that would otherwise keep
-	// server.close() from completing.
+	// Track sockets so teardown can force-destroy a lingering ignored-path upgrade.
 	const sockets = new Set<Socket>();
 	server.on('connection', (socket) => {
 		sockets.add(socket);
@@ -68,95 +97,9 @@ function attempt(
 	});
 }
 
-/** Connect, expect a `ready` frame, send text, expect it echoed back. */
-function readyAndEcho(
-	url: string
-): Promise<{ ready: boolean; echo: string | null }> {
-	return new Promise((resolve, reject) => {
-		const ws = new WebSocket(url);
-		let ready = false;
-		const timer = setTimeout(() => {
-			ws.terminate();
-			reject(new Error('timeout waiting for ready/echo'));
-		}, 3000);
-		ws.on('message', (raw: Buffer) => {
-			const msg = JSON.parse(raw.toString()) as {
-				type: string;
-				text?: string;
-			};
-			if (msg.type === 'ready') {
-				ready = true;
-				ws.send('hello');
-			} else if (msg.type === 'echo') {
-				clearTimeout(timer);
-				ws.close();
-				resolve({ ready, echo: msg.text ?? null });
-			}
-		});
-		ws.on('error', (err) => {
-			clearTimeout(timer);
-			reject(err);
-		});
-	});
-}
-
-/** A small mono PCM16 @24kHz buffer, the format the browser streams as audio. */
-function fakePcm16Frame(samples = 1200): ArrayBuffer {
-	const pcm = new Int16Array(samples);
-	for (let i = 0; i < samples; i++) {
-		pcm[i] = Math.round(Math.sin(i / 8) * 0x4000);
-	}
-	return pcm.buffer;
-}
-
 /**
- * Connect, wait for `ready`, stream a few binary audio frames, and report
- * whether the socket stayed open (audio frames must not drop the connection).
- * A1 ignores audio; A3 turns it into transcript events.
- */
-function streamAudio(
-	url: string,
-	frames = 3
-): Promise<{ ready: boolean; stillOpen: boolean }> {
-	return new Promise((resolve, reject) => {
-		const ws = new WebSocket(url);
-		ws.binaryType = 'arraybuffer';
-		let ready = false;
-		const timer = setTimeout(() => {
-			ws.terminate();
-			reject(new Error('timeout waiting for ready'));
-		}, 3000);
-		ws.on('message', (raw: Buffer, isBinary: boolean) => {
-			if (isBinary) {
-				reject(new Error('unexpected binary frame from server'));
-				return;
-			}
-			const msg = JSON.parse(raw.toString()) as { type: string };
-			if (msg.type === 'ready') {
-				ready = true;
-				for (let i = 0; i < frames; i++) {
-					ws.send(fakePcm16Frame());
-				}
-				// Give the server a tick to (not) react, then check liveness.
-				setTimeout(() => {
-					const stillOpen = ws.readyState === WebSocket.OPEN;
-					clearTimeout(timer);
-					ws.close();
-					resolve({ ready, stillOpen });
-				}, 200);
-			}
-		});
-		ws.on('error', (err) => {
-			clearTimeout(timer);
-			reject(err);
-		});
-	});
-}
-
-/**
- * True if no session is established on `url` — either the upgrade is ignored
- * (socket hangs until our timeout) or the handshake is refused. False only if
- * the socket actually opens or emits a frame.
+ * True if no session is established on `url` — the upgrade is ignored (socket
+ * hangs until timeout) or the handshake is refused.
  */
 function staysSilent(url: string, ms = 600): Promise<boolean> {
 	return new Promise((resolve) => {
@@ -174,35 +117,58 @@ function staysSilent(url: string, ms = 600): Promise<boolean> {
 		const timer = setTimeout(() => finish(true), ms);
 		ws.on('open', () => finish(false));
 		ws.on('message', () => finish(false));
-		// Refused handshake, or the `terminate()` above → no session. Keep this
-		// listener attached so terminate()'s error is handled, not thrown.
 		ws.on('error', () => finish(true));
 	});
 }
 
-describe('attachTranscriptionWs', () => {
-	describe('authentication', () => {
-		it('accepts a valid key and sends a ready frame, then echoes text', async () => {
-			const server = await startServer(makeConfig());
-			try {
-				const result = await readyAndEcho(
-					`${server.url}/ai/transcribe?key=${VALID_KEY}`
-				);
-				expect(result.ready).toBe(true);
-				expect(result.echo).toBe('hello');
-			} finally {
-				await server.close();
+/** Connect, stream audio on `ready`, collect events until `stopOn` arrives. */
+function drive(url: string, stopOn: string): Promise<ClientEvent[]> {
+	return new Promise((resolve, reject) => {
+		const ws = new WebSocket(url);
+		ws.binaryType = 'arraybuffer';
+		const events: ClientEvent[] = [];
+		const timer = setTimeout(
+			() => reject(new Error('timeout waiting for ' + stopOn)),
+			4000
+		);
+		ws.on('message', (raw: Buffer) => {
+			const msg = JSON.parse(raw.toString()) as ClientEvent;
+			events.push(msg);
+			if (msg.type === 'ready') {
+				ws.send(new Int16Array(1200).fill(777).buffer);
+			} else if (msg.type === stopOn) {
+				clearTimeout(timer);
+				ws.close();
+				resolve(events);
 			}
 		});
+		ws.on('error', (err) => {
+			clearTimeout(timer);
+			reject(err);
+		});
+	});
+}
 
-		it('accepts streamed binary audio frames and keeps the socket open', async () => {
+async function waitFor(condition: () => boolean, ms = 1500): Promise<void> {
+	const start = Date.now();
+	while (!condition()) {
+		if (Date.now() - start > ms) {
+			throw new Error('waitFor timed out');
+		}
+		await new Promise((r) => setTimeout(r, 20));
+	}
+}
+
+describe('attachTranscriptionWs', () => {
+	describe('authentication', () => {
+		it('accepts a valid key (handshake upgrades)', async () => {
 			const server = await startServer(makeConfig());
 			try {
-				const result = await streamAudio(
-					`${server.url}/ai/transcribe?key=${VALID_KEY}`
-				);
-				expect(result.ready).toBe(true);
-				expect(result.stillOpen).toBe(true);
+				expect(
+					await attempt(
+						`${server.url}/ai/transcribe?key=${VALID_KEY}`
+					)
+				).toBe('open');
 			} finally {
 				await server.close();
 			}
@@ -223,8 +189,9 @@ describe('attachTranscriptionWs', () => {
 		it('rejects a missing key', async () => {
 			const server = await startServer(makeConfig());
 			try {
-				const result = await attempt(`${server.url}/ai/transcribe`);
-				expect(result).toBe('rejected');
+				expect(await attempt(`${server.url}/ai/transcribe`)).toBe(
+					'rejected'
+				);
 			} finally {
 				await server.close();
 			}
@@ -309,14 +276,95 @@ describe('attachTranscriptionWs', () => {
 				makeConfig({ routePrefix: '/custom' })
 			);
 			try {
-				const onCustom = await attempt(
-					`${server.url}/custom/transcribe?key=${VALID_KEY}`
+				expect(
+					await attempt(
+						`${server.url}/custom/transcribe?key=${VALID_KEY}`
+					)
+				).toBe('open');
+				expect(
+					await staysSilent(
+						`${server.url}/ai/transcribe?key=${VALID_KEY}`
+					)
+				).toBe(true);
+			} finally {
+				await server.close();
+			}
+		});
+	});
+
+	describe('transcription session', () => {
+		it('runs end-to-end through a provider and reports usage', async () => {
+			const fake = await startFakeOpenAI((socket) => {
+				socket.send(
+					JSON.stringify({
+						type: 'conversation.item.input_audio_transcription.delta',
+						delta: 'Hi'
+					})
 				);
-				const onDefault = await staysSilent(
-					`${server.url}/ai/transcribe?key=${VALID_KEY}`
+				socket.send(
+					JSON.stringify({
+						type: 'conversation.item.input_audio_transcription.completed',
+						transcript: 'Hi there',
+						usage: {
+							input_token_details: {
+								audio_tokens: 200,
+								text_tokens: 4
+							},
+							input_tokens: 204,
+							output_tokens: 3
+						}
+					})
 				);
-				expect(onCustom).toBe('open');
-				expect(onDefault).toBe(true);
+			});
+			const usageEvents: UsageStats[] = [];
+			const server = await startServer(
+				makeConfig({
+					providers: {
+						openai: {
+							type: 'openai',
+							apiKey: 'sk-test',
+							options: { realtimeTranscriptionUrl: fake.url }
+						}
+					},
+					onUsage: (stats) => {
+						usageEvents.push(stats);
+					}
+				})
+			);
+
+			try {
+				const events = await drive(
+					`${server.url}/ai/transcribe?key=${VALID_KEY}&model=gpt-4o-mini-transcribe`,
+					'final'
+				);
+				expect(events.map((e) => e.type)).toContain('ready');
+				expect(events.find((e) => e.type === 'final')?.text).toBe(
+					'Hi there'
+				);
+
+				// Usage is reported when the session ends (client closed on final).
+				await waitFor(() => usageEvents.length > 0);
+				const stats = usageEvents[0];
+				expect(stats.provider).toBe('openai');
+				expect(stats.model).toBe('gpt-4o-mini-transcribe');
+				expect(stats.credits.audioInputTokens).toBe(200);
+				expect(stats.credits.credits).toBeGreaterThan(0);
+			} finally {
+				await server.close();
+				await fake.close();
+			}
+		});
+
+		it('sends an error frame when no provider is configured', async () => {
+			const server = await startServer(makeConfig());
+			try {
+				const events = await drive(
+					`${server.url}/ai/transcribe?key=${VALID_KEY}`,
+					'error'
+				);
+				expect(events.find((e) => e.type === 'error')?.message).toMatch(
+					/provider/i
+				);
 			} finally {
 				await server.close();
 			}

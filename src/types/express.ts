@@ -23,13 +23,19 @@ export interface ProviderUsage {
 	inputTokens?: number;
 	outputTokens?: number;
 	cachedInputTokens?: number;
+	/**
+	 * Audio input tokens (speech-to-text). Part of `inputTokens` but billed at
+	 * the model's audio rate; the remainder of `inputTokens` is billed as text.
+	 */
+	audioInputTokens?: number;
 }
 
 export interface ModelPricing {
-	input: number; // $ per 1M tokens
-	cachedInput: number; // $ per 1M tokens
-	output: number; // $ per 1M tokens
-};
+	input: number; // $ per 1M text input tokens
+	cachedInput: number; // $ per 1M cached input tokens
+	output: number; // $ per 1M output tokens
+	audioInput?: number; // $ per 1M audio input tokens (transcription models)
+}
 
 export interface CreditsCost {
 	credits: number;
@@ -37,6 +43,7 @@ export interface CreditsCost {
 	inputTokens: number;
 	outputTokens: number;
 	cachedInputTokens: number;
+	audioInputTokens?: number;
 }
 
 /**
