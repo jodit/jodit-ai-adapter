@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.12]
+
+### Added
+- **Speech-to-Text WebSocket endpoint** (`${routePrefix}/transcribe`, default
+  `/ai/transcribe`) — authenticated transport for proxying realtime audio
+  transcription so the provider key stays server-side. Reuses the HTTP auth rules
+  (key format, referer, `checkAuthentication`) on the upgrade handshake. Exposed
+  via the new `attachTranscriptionWs(server, config)` export for integration mode;
+  attached automatically to the standalone server in `start()`.
+- `ws` runtime dependency.
+- Test suite `src/ws/transcription-ws.test.ts` covering auth, referer enforcement
+  and path scoping.
+
+> This release adds the authenticated transport only. The realtime audio→transcript
+> protocol and per-credit metering land in subsequent releases.
+
 ## [0.2.11]
 
 ### Fixed

@@ -6,7 +6,7 @@ import { logger } from '../helpers/logger';
 /**
  * Default API key pattern: 36 characters, A-F, 0-9, and hyphens
  */
-const DEFAULT_API_KEY_PATTERN = /^[A-F0-9-]{36}$/i;
+export const DEFAULT_API_KEY_PATTERN = /^[A-F0-9-]{36}$/i;
 
 /**
  * Extract API key from request
@@ -63,7 +63,7 @@ function extractReferer(req: Request): string | undefined {
 /**
  * Validate API key format
  */
-function validateApiKeyFormat(
+export function validateApiKeyFormat(
 	apiKey: string,
 	pattern: RegExp = DEFAULT_API_KEY_PATTERN
 ): boolean {
@@ -73,7 +73,7 @@ function validateApiKeyFormat(
 /**
  * Validate referer against allowed patterns
  */
-function validateReferer(
+export function validateReferer(
 	referer: string | undefined,
 	allowedPatterns: RegExp[] | undefined
 ): boolean {

@@ -7,6 +7,7 @@ import type {
 	UsageStats
 } from './types';
 import { createApp } from './app';
+import { attachTranscriptionWs } from './ws/transcription-ws';
 import { logger } from './helpers/logger';
 import { defaultConfig } from './config/default-config';
 import packageJson from '../package.json' with { type: 'json' };
@@ -18,6 +19,8 @@ let server: Server | null = null;
 
 // Re-export for direct use
 export { createApp };
+export { attachTranscriptionWs } from './ws/transcription-ws';
+export type { TranscriptionAuthContext } from './ws/transcription-ws';
 export type {
 	AppConfig,
 	AuthCallback,
@@ -125,6 +128,11 @@ export async function start(
 
 		server.on('error', reject);
 
+		// Attach the speech-to-text transcription WebSocket to the standalone
+		// server. In integration mode the host owns the http.Server and calls
+		// `attachTranscriptionWs` itself.
+		const transcriptionWs = attachTranscriptionWs(server, finalConfig);
+
 		/**
 		 * Stop the adapter service
 		 */
@@ -151,6 +159,11 @@ export async function start(
 		};
 
 		const originalCleanup = app.cleanup;
-		app.cleanup = (): Promise<unknown> => Promise.allSettled([originalCleanup(), stop()]);
+		app.cleanup = (): Promise<unknown> =>
+			Promise.allSettled([
+				originalCleanup(),
+				stop(),
+				Promise.resolve(transcriptionWs.close())
+			]);
 	});
 }

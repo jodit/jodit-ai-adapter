@@ -1,7 +1,7 @@
 {
 	"name": "jodit-ai-adapter",
 	"displayName": "Jodit AI Assistant Adapter Service",
-	"version": "0.2.11",
+	"version": "0.2.12",
 	"description": "Universal AI adapter service for Jodit Editor AI Assistant Pro using Vercel AI SDK",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
@@ -74,6 +74,7 @@
 		"ioredis": "^5.9.2",
 		"undici": "^7.21.0",
 		"winston": "^3.19.0",
+		"ws": "^8.21.0",
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {
@@ -84,6 +85,7 @@
 		"@types/jest": "^30.0.0",
 		"@types/node": "^25.2.1",
 		"@types/supertest": "^6.0.3",
+		"@types/ws": "^8.18.1",
 		"@typescript-eslint/eslint-plugin": "^8.54.0",
 		"@typescript-eslint/parser": "^8.54.0",
 		"concurrently": "^9.2.1",

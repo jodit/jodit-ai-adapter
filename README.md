@@ -258,6 +258,38 @@ Authorization: Bearer 12345678-1234-1234-1234-123456789abc
 
 Returns configured providers and their settings.
 
+### Speech-to-Text (WebSocket)
+
+```http
+GET /ai/transcribe?key=12345678-1234-1234-1234-123456789abc
+Upgrade: websocket
+```
+
+A WebSocket endpoint for streaming microphone audio and receiving transcription
+events. The browser opens the socket and streams audio; the server proxies it to
+the provider's realtime transcription so the provider key stays server-side and
+usage can be metered. Authentication is identical to the HTTP routes — the API
+key is taken from `?key=`/`?apikey=`, `Authorization: Bearer <key>`, or
+`x-api-key` during the upgrade handshake, and an unauthenticated handshake is
+refused before the WebSocket opens.
+
+Mount path follows `routePrefix` (default `/ai`), so the endpoint is
+`${routePrefix}/transcribe`. In integration mode (mounting onto an existing
+server) attach it to your `http.Server` yourself:
+
+```typescript
+import { attachTranscriptionWs } from 'jodit-ai-adapter';
+
+const handle = attachTranscriptionWs(httpServer, config);
+// handle.close() detaches the upgrade listener and closes the WebSocket server
+```
+
+> **Status:** the authenticated transport is in place; on connect the server
+> sends `{ "type": "ready" }`. The realtime audio→transcript protocol (audio
+> frames in, `delta`/`final` transcript events out) and credit metering are
+> being added in the following releases — see the
+> [Speech-to-Text guide](https://jodit.github.io/jodit-ai-adapter/speech-to-text/).
+
 ## Authentication
 
 The service validates:

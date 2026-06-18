@@ -11,5 +11,5 @@ export default defineConfig({
 	minify: false,
 	target: 'node18',
 	outDir: 'dist',
-	external: ['express', 'ai', 'winston', 'dotenv', '@hapi/boom', 'zod']
+	external: ['express', 'ai', 'winston', 'dotenv', '@hapi/boom', 'zod', 'ws']
 });
