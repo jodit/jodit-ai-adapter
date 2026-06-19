@@ -145,18 +145,24 @@ interface SessionParams {
 	provider?: string;
 	model?: string;
 	language?: string;
+	silenceMs?: number;
 }
 
 /** Read `provider` / `model` / `language` from the upgrade request URL. */
 function parseSessionParams(req: IncomingMessage): SessionParams {
 	const url = new URL(req.url ?? '', 'http://localhost');
+	const silenceRaw = Number.parseInt(
+		url.searchParams.get('silence') ?? '',
+		10
+	);
 	return {
 		provider: url.searchParams.get('provider') ?? undefined,
 		model: url.searchParams.get('model') ?? undefined,
 		language:
 			url.searchParams.get('language') ??
 			url.searchParams.get('lang') ??
-			undefined
+			undefined,
+		silenceMs: Number.isFinite(silenceRaw) ? silenceRaw : undefined
 	};
 }
 
@@ -267,7 +273,11 @@ function handleConnection(
 
 	const session: ITranscriptionSession = {
 		client: ws,
-		context: { model: params.model, language: params.language },
+		context: {
+			model: params.model,
+			language: params.language,
+			silenceMs: params.silenceMs
+		},
 		signal: controller.signal,
 		reportUsage: (usage) =>
 			routeTranscriptionUsage(config, adapter, auth, providerName, usage)

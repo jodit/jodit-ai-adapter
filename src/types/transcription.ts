@@ -11,6 +11,12 @@ export interface ITranscriptionContext {
 	model?: string;
 	/** BCP-47 language hint, e.g. `en-US`. */
 	language?: string;
+	/**
+	 * Silence (ms) the voice-activity detector waits before committing a phrase.
+	 * Lower = more frequent interim/final results on shorter pauses. Defaults to
+	 * the adapter's value when unset.
+	 */
+	silenceMs?: number;
 }
 
 /**

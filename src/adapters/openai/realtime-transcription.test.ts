@@ -204,6 +204,7 @@ describe('runOpenAITranscriptionSession', () => {
 					input: {
 						format: { type: string; rate: number };
 						transcription: { model: string; language: string };
+						turn_detection: { silence_duration_ms: number };
 					};
 				};
 			};
@@ -216,6 +217,10 @@ describe('runOpenAITranscriptionSession', () => {
 				type: 'audio/pcm',
 				rate: 24000
 			});
+			// Default VAD silence (no silenceMs in context).
+			expect(session.audio.input.turn_detection.silence_duration_ms).toBe(
+				200
+			);
 
 			// Audio was forwarded as base64 of the PCM we sent.
 			expect(fake.audioChunks.length).toBeGreaterThanOrEqual(1);

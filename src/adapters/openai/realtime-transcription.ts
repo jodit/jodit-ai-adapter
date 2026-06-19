@@ -16,6 +16,18 @@ const DEFAULT_REALTIME_URL =
 	'wss://api.openai.com/v1/realtime?intent=transcription';
 const DEFAULT_MODEL = 'gpt-4o-mini-transcribe';
 const TARGET_SAMPLE_RATE = 24000;
+// Silence (ms) before the VAD commits a phrase. Lower = more frequent interim/
+// final results on short pauses. Clamped to a sane range.
+const DEFAULT_SILENCE_MS = 200;
+const MIN_SILENCE_MS = 100;
+const MAX_SILENCE_MS = 2000;
+
+function clampSilence(ms: number | undefined): number {
+	if (ms === undefined || !Number.isFinite(ms)) {
+		return DEFAULT_SILENCE_MS;
+	}
+	return Math.min(MAX_SILENCE_MS, Math.max(MIN_SILENCE_MS, ms));
+}
 
 export interface OpenAIRealtimeTranscriptionOptions {
 	apiKey: string;
@@ -67,6 +79,7 @@ export function runOpenAITranscriptionSession(
 	const { client, context, signal } = session;
 	const model = context.model || DEFAULT_MODEL;
 	const language = (context.language || 'en').split('-')[0].toLowerCase();
+	const silenceMs = clampSilence(context.silenceMs);
 	const url = options.url || DEFAULT_REALTIME_URL;
 
 	return new Promise<void>((resolve) => {
@@ -133,7 +146,7 @@ export function runOpenAITranscriptionSession(
 									type: 'server_vad',
 									threshold: 0.5,
 									prefix_padding_ms: 300,
-									silence_duration_ms: 500
+									silence_duration_ms: silenceMs
 								}
 							}
 						}
