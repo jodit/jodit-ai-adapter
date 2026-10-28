@@ -141,7 +141,8 @@ export abstract class BaseAdapter {
 			onError: ({ error }) => {
 				logger.error('streamText error');
 				logger.error(error);
-			}
+			},
+			allowSystemInMessages: true
 		});
 
 		const responseId = this.generateResponseId('stream');
@@ -164,7 +165,7 @@ export abstract class BaseAdapter {
 						}
 					};
 
-					for await (const part of result.fullStream) {
+					for await (const part of result.stream) {
 						switch (part.type) {
 							case 'text-delta': {
 								fullText += part.text;
@@ -257,7 +258,8 @@ export abstract class BaseAdapter {
 			abortSignal: params.abortSignal,
 			maxOutputTokens: params.maxOutputTokens,
 			tools: params.tools,
-			providerOptions: this.getProviderOptions(context)
+			providerOptions: this.getProviderOptions(context),
+			allowSystemInMessages: true
 		});
 
 		const responseId = result.response.id;
@@ -377,7 +379,8 @@ export abstract class BaseAdapter {
 			schema: z.object({
 				suggestions: z.array(z.string()).describe('Array of autocomplete text suggestions')
 			}),
-			abortSignal: signal
+			abortSignal: signal,
+			allowSystemInMessages: true
 		});
 
 		const responseId = result.response?.id || this.generateResponseId('ac');
