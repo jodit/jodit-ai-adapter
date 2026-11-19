@@ -8,12 +8,18 @@
 | `NODE_ENV` | Environment mode | `development` |
 | `OPENAI_API_KEY` | OpenAI API key | - |
 | `OPENAI_DEFAULT_MODEL` | Default OpenAI model | `gpt-5.2` |
+| `DEEPSEEK_API_KEY` | Enables DeepSeek text generation and autocomplete | - |
+| `DEEPSEEK_DEFAULT_MODEL` | Default DeepSeek model | `deepseek-flash` |
 | `RATE_LIMIT_ENABLED` | Enable rate limiting | `false` |
 | `RATE_LIMIT_TYPE` | Rate limiter type (`memory` or `redis`) | `memory` |
 | `REDIS_URL` | Redis connection URL | - |
 | `CORS_ORIGIN` | CORS allowed origins | `*` |
 | `ROUTE_PREFIX` | Route prefix for all endpoints | `/ai` |
 | `CONFIG_FILE` | Path to JSON config file | - |
+
+## DeepSeek
+
+Set `provider` to `deepseek` for chat, streaming and autocomplete. The available models are `deepseek-flash` and `deepseek-v4-pro`. Set `aiAssistantPro.apiMode` to `full` in Jodit so each chat request includes the conversation history and tool results. Jodit credits use DeepSeek's off-peak token rates for both models throughout the day.
 
 ## Standalone Server
 

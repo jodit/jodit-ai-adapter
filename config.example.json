@@ -13,7 +13,7 @@
 		"deepseek": {
 			"type": "deepseek",
 			"apiEndpoint": "https://api.deepseek.com",
-			"defaultModel": "deepseek-chat"
+			"defaultModel": "deepseek-flash"
 		}
 	}
 }

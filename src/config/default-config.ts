@@ -22,18 +22,19 @@ export const defaultConfig: AppConfig = {
 			apiEndpoint: process.env.OPENAI_API_ENDPOINT,
 			defaultModel: process.env.OPENAI_DEFAULT_MODEL || 'gpt-5.2',
 			httpProxy: process.env.HTTP_PROXY
-		}
-		// Add more providers as needed:
-		// deepseek: {
-		// 	type: 'deepseek',
-		// 	apiKey: process.env.DEEPSEEK_API_KEY,
-		// 	defaultModel: 'deepseek-chat'
-		// },
-		// anthropic: {
-		// 	type: 'anthropic',
-		// 	apiKey: process.env.ANTHROPIC_API_KEY,
-		// 	defaultModel: 'claude-3-opus-20240229'
-		// }
+		},
+		...(process.env.DEEPSEEK_API_KEY
+			? {
+					deepseek: {
+						type: 'deepseek' as const,
+						apiKey: process.env.DEEPSEEK_API_KEY,
+						apiEndpoint: process.env.DEEPSEEK_API_ENDPOINT,
+						defaultModel:
+							process.env.DEEPSEEK_DEFAULT_MODEL ||
+							'deepseek-flash'
+					}
+				}
+			: {})
 	},
 	rateLimit:
 		process.env.RATE_LIMIT_ENABLED === 'true'

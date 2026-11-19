@@ -179,6 +179,10 @@ export const aiRequestHandler = (config: AppConfig): RequestHandler =>
 			);
 		}
 
+		if (provider === 'deepseek' && context.mode === 'incremental' && context.parentMessageId) {
+			throw Boom.badRequest('DeepSeek chat requires the full message history. Set apiMode to full.');
+		}
+
 		// Create adapter
 		const adapter = AdapterFactory.createAdapter(provider, providerConfig);
 

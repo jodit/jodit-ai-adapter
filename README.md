@@ -628,7 +628,7 @@ providers: {
   deepseek: {
     type: 'deepseek',
     apiKey: process.env.DEEPSEEK_API_KEY,
-    defaultModel: 'deepseek-chat'
+    defaultModel: 'deepseek-flash'
   }
 }
 ```

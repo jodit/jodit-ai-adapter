@@ -113,6 +113,7 @@ export const autocompleteHandler = (config: AppConfig): RequestHandler =>
 			const cause = RetryError.isInstance(error) ? error.lastError : error;
 			if (APICallError.isInstance(cause)) {
 				if (
+					(provider === 'deepseek' && cause.statusCode === 402) ||
 					insufficientQuota.safeParse(cause.data).success ||
 					/^You have no credits remaining\b/i.test(cause.message)
 				) {

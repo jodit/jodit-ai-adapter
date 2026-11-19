@@ -1,7 +1,7 @@
 {
 	"name": "jodit-ai-adapter",
 	"displayName": "Jodit AI Assistant Adapter Service",
-	"version": "0.2.16",
+	"version": "0.2.17",
 	"description": "Universal AI adapter service for Jodit Editor AI Assistant Pro using Vercel AI SDK",
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
@@ -64,6 +64,7 @@
 	"author": "Chupurnov Valeriy <chupurnov@gmail.com>",
 	"license": "MIT",
 	"dependencies": {
+		"@ai-sdk/deepseek": "^2.0.82",
 		"@ai-sdk/openai": "^3.0.26",
 		"@hapi/boom": "^10.0.1",
 		"ai": "^6.0.76",
