@@ -1,10 +1,19 @@
 import type { RequestHandler, Response } from 'express';
 import asyncHandler from 'express-async-handler';
 import Boom from '@hapi/boom';
+import { APICallError, RetryError } from 'ai';
+import { z } from 'zod';
 import type { AppConfig, AuthenticatedRequest, ProviderUsage } from '../../types';
 import { AdapterFactory } from '../../adapters/adapter-factory';
 import { logger } from '../../helpers/logger';
 import { AutocompleteBodySchema, AutocompleteQuerySchema } from './schema';
+
+const insufficientQuota = z.object({
+	error: z.union([
+		z.object({ code: z.literal('insufficient_quota') }),
+		z.object({ type: z.literal('insufficient_quota') })
+	])
+});
 
 /**
  * Autocomplete handler factory
@@ -99,6 +108,24 @@ export const autocompleteHandler = (config: AppConfig): RequestHandler =>
 		} catch (error) {
 			if (error instanceof Error && error.name === 'AbortError') {
 				throw Boom.clientTimeout('Autocomplete request timed out');
+			}
+
+			const cause = RetryError.isInstance(error) ? error.lastError : error;
+			if (APICallError.isInstance(cause)) {
+				if (
+					insufficientQuota.safeParse(cause.data).success ||
+					/^You have no credits remaining\b/i.test(cause.message)
+				) {
+					throw Boom.serverUnavailable(
+						'Autocomplete is unavailable because the AI provider account has run out of credits. Contact the service administrator.'
+					);
+				}
+
+				if (cause.statusCode === 429) {
+					throw Boom.tooManyRequests(
+						'The AI provider rate limit was reached. Try again later.'
+					);
+				}
 			}
 
 			throw Boom.internal(

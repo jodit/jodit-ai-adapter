@@ -114,6 +114,57 @@ describe('POST /ai/autocomplete', () => {
 		expect(res.body.result.suggestions.length).toBeLessThanOrEqual(3);
 	});
 
+	it.each([
+		{
+			status: 429,
+			code: 'insufficient_quota',
+			message: 'Quota exceeded',
+			expectedStatus: 503,
+			expectedMessage:
+				'Autocomplete is unavailable because the AI provider account has run out of credits. Contact the service administrator.'
+		},
+		{
+			status: 402,
+			code: null,
+			message:
+				'You have no credits remaining. Add credits to continue using the API.',
+			expectedStatus: 503,
+			expectedMessage:
+				'Autocomplete is unavailable because the AI provider account has run out of credits. Contact the service administrator.'
+		},
+		{
+			status: 429,
+			code: 'rate_limit_exceeded',
+			message: 'Rate limit reached',
+			expectedStatus: 429,
+			expectedMessage:
+				'The AI provider rate limit was reached. Try again later.'
+		}
+	])(
+		'returns $expectedStatus for provider error "$message"',
+		async ({ status, code, message, expectedStatus, expectedMessage }) => {
+			nock(OPENAI_BASE)
+				.persist()
+				.post('/v1/responses')
+				.reply(
+					status,
+					{ error: { code, message } },
+					{ 'retry-after-ms': '1' }
+				);
+
+			const res = await request(result.app)
+				.post('/ai/autocomplete?query=Hi%C2%A0my%C2%A0')
+				.set(authHeader())
+				.send({ provider: 'openai', context: { maxSuggestions: 3 } });
+
+			expect(res.status).toBe(expectedStatus);
+			expect(res.body).toMatchObject({
+				success: false,
+				error: { code: expectedStatus, message: expectedMessage }
+			});
+		}
+	);
+
 	it('should handle OpenAI API errors', async () => {
 		nock(OPENAI_BASE)
 			.post('/v1/responses')
